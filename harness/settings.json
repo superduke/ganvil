@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(harness-artifacts/*)",
+      "Write(harness-artifacts/*)",
+      "Edit(harness-artifacts/*)"
+    ]
+  }
+}

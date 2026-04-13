@@ -1,0 +1,9 @@
+{
+  "name": "harness",
+  "description": "Long-running autonomous coding harness with Planner-Generator-Evaluator architecture and Sprint decomposition, inspired by Anthropic's harness design research",
+  "version": "1.0.0",
+  "author": {
+    "name": "zhangyabei"
+  },
+  "license": "MIT"
+}
