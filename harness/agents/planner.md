@@ -78,12 +78,13 @@ Focus on **product context and high-level technical design**, NOT on granular im
 
 ### Step 3.5: Determine Execution Mode
 
-Based on the project's complexity, choose one of two execution modes:
+Based on the project's complexity, choose the execution mode:
 
-- **SPRINT mode** (default): Use when the project has 3+ distinct feature areas, requires sequential dependency management, or is classified as FULLSTACK. Proceed to Step 4 for sprint decomposition.
+- **SPRINT mode** (default): Use when the project has 3+ distinct feature areas, requires sequential dependency management, or is classified as FULLSTACK. This is the default mode, designed for models operating within a 200K token context window. Proceed to Step 4 for sprint decomposition.
 - **CONTINUOUS mode**: Use when the project is a focused, single-concern application (e.g., a landing page, a simple API, a single-purpose tool) where the full scope can be implemented coherently in one pass. Skip Step 4, and instead write a single comprehensive "Sprint S1" that covers the entire scope.
+- **CONTINUOUS-LITE mode**: **Only use when the user explicitly specifies this mode** (e.g., "use continuous-lite mode" or "build without sprints"). This mode skips sprint contract negotiation entirely and lets the generator build the full application freely, followed by a single end-pass QA evaluation. Designed for advanced models with extended context capabilities (e.g., Opus 4.6+). When using this mode, still write the full feature list in the spec but skip Step 4 sprint decomposition.
 
-Write the chosen mode in the spec under Project Classification: `Execution Mode: SPRINT | CONTINUOUS`
+Write the chosen mode in the spec under Project Classification: `Execution Mode: SPRINT | CONTINUOUS | CONTINUOUS-LITE`
 
 ### Step 4: Decompose into Sprints
 

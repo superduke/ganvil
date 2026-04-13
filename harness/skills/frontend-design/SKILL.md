@@ -22,6 +22,29 @@ Before making any design decision, understand:
 
 **CRITICAL**: Choose a clear conceptual direction and execute it with precision. Bold maximalism and refined minimalism both work — the key is intentionality, not intensity.
 
+## Design Reference Library
+
+For inspiration and calibration, reference real-world design systems from the [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) collection. Each entry represents a standout design identity:
+
+### High-Caliber Design References (by domain)
+
+| Domain | Reference | Design Character | Why It's Exceptional |
+|--------|-----------|-----------------|---------------------|
+| Dev Tools | **Linear** | Ultra-minimal, precise, purple accent | Every pixel is intentional. Spacing, typography, and color serve function and mood equally |
+| Dev Tools | **Vercel** | Black/white precision, Geist font | Radical restraint used as a design weapon. Nothing extra, nothing missing |
+| Fintech | **Stripe** | Purple gradients, weight-300 elegance | Signature gradient meshes create depth and warmth. Typography is light yet legible |
+| Fintech | **Revolut** | Sleek dark interface, gradient cards | Premium dark surfaces with vibrant card accents create financial confidence |
+| E-commerce | **Shopify** | Dark cinematic, neon green accent | Full-bleed photography, ultra-light display type, unexpected for e-commerce |
+| E-commerce | **Airbnb** | Warm coral accent, rounded UI | Photography-driven design with consistently warm, inviting palette |
+| Consumer | **Apple** | Premium white space, cinematic imagery | SF Pro font system, dramatic full-viewport product shots |
+| Consumer | **Spotify** | Vibrant green on dark, bold type | Album-art-driven layouts that feel alive and dynamic |
+| Creative | **Framer** | Bold black/blue, motion-first | Design itself IS the content — every transition and animation communicates |
+| Creative | **Figma** | Vibrant multi-color, playful-professional | Rainbow palette that somehow stays cohesive through deliberate constraining |
+| Editorial | **The Verge** | Acid-mint, ultraviolet accents | Custom Manuka display type, deliberately jarring and memorable |
+| Automotive | **Tesla** | Radical subtraction, cinematic photography | Universal Sans, near-empty black/white canvas, product is the hero |
+
+Use these as comparison anchors when evaluating or generating designs. Ask: "Does this design have the intentionality of Linear? The warmth of Airbnb? The boldness of The Verge?"
+
 ## Aesthetic Guidelines
 
 ### Typography
@@ -77,20 +100,88 @@ Technical execution: typography hierarchy, spacing consistency, color harmony, c
 ### 4. Functionality (Weight: STANDARD)
 Usability independent of aesthetics. Can users understand what the interface does, find primary actions, and complete tasks without guessing? Are error states handled?
 
+## Calibration Examples
+
+Use these examples to anchor your scoring. Re-read them before every evaluation round to prevent score drift.
+
+### Example A: Generic Task Manager (FAIL)
+**Scores: DQ=4, OG=3, CR=6, FN=7**
+
+What the evaluator observed:
+- White background, Bootstrap-like card grid with equal padding on all sides
+- Purple gradient header bar → classic AI slop pattern
+- Inter font at system-default sizes, no typographic hierarchy variance
+- Card shadows all identical depth, no visual differentiation between card types
+- Button styles are default Tailwind `bg-blue-500 hover:bg-blue-600`
+- Form inputs use browser-default focus rings
+- Functionally complete: CRUD works, navigation is clear, form validation responds
+
+Score rationale:
+- **DQ=4**: Components feel assembled from different sources. The purple header clashes with the blue buttons. No cohesive mood.
+- **OG=3**: Every element screams "AI-generated default". A human designer would immediately spot the template origins. Zero custom decisions.
+- **CR=6**: Spacing IS consistent and contrast ratios pass WCAG. The fundamentals work — this is pure technical competence without artistry.
+- **FN=7**: All features work. Users can complete tasks. Error messages appear on invalid input. Navigation is intuitive.
+
+### Example B: Portfolio Site with Editorial Aesthetic (PASS)
+**Scores: DQ=8, OG=8, CR=7, FN=7**
+
+What the evaluator observed:
+- Dark charcoal (#1a1a1a) base with cream (#f5f0eb) text, warm amber (#d4a574) accents
+- Custom Newsreader serif for headings paired with Karla for body text — distinctive and intentional
+- Asymmetric two-column layout: narrow text column (40%) with full-bleed image column (60%)
+- Hover effects: images desaturate on mouseout, saturate + subtle scale on hover
+- Navigation is a vertical left-edge stack with 90-degree rotated text labels
+- Page transitions use CSS `clip-path` reveal animations, staggered by 80ms
+- One issue: mobile layout collapses the asymmetry into a generic single-column stack
+
+Score rationale:
+- **DQ=8**: Clear "editorial photography" mood executed consistently. Color palette, typography, and layout all support the same identity. Deducted from 9 because the mobile layout loses the aesthetic coherence.
+- **OG=8**: Multiple standout decisions: rotated navigation, asymmetric columns, desaturation hover effect. These aren't template defaults — they're deliberate creative choices. Minor: footer uses a generic three-column grid.
+- **CR=7**: Typography hierarchy works well at desktop. Spacing is generous and intentional. The clip-path animations are smooth. Deducted: some body text line-heights are too tight at smaller sizes.
+- **FN=7**: Portfolio items are browsable, filtering works, contact form submits. The rotated navigation is learnable but not immediately obvious to first-time users.
+
+### Example C: 3D Art Gallery Experience (EXCEPTIONAL)
+**Scores: DQ=9, OG=10, CR=8, FN=6**
+
+What the evaluator observed:
+- CSS 3D perspective room with checkered marble floor rendered via CSS gradients
+- Artwork "hung" on walls using absolute positioning with transform: perspective()
+- Navigation between gallery rooms via doorway-shaped click targets
+- Dramatic lighting: CSS `radial-gradient` spotlights on each artwork piece
+- Custom cursor changes to a pointing hand near artwork, a walking figure in corridors
+- Sound icon in corner (non-functional — visual element only)
+- Completely breaks the expected "gallery website" mold
+
+Score rationale:
+- **DQ=9**: The spatial experience IS the design. Every visual choice serves the gallery metaphor. The marble floor, spotlight gradients, and doorway navigation create genuine atmosphere. Almost 10, but some texture rendering is rough at high DPI.
+- **OG=10**: Nobody expects a 3D room built in CSS. This is the kind of creative leap that makes you want to show it to someone. Every design decision is a surprise that works in context.
+- **CR=8**: The CSS perspective math is correct, animations are smooth, gradients render cleanly. The checkered floor pattern has some aliasing artifacts. Cursor changes work.
+- **FN=6**: Navigation works but isn't immediately intuitive. First-time users might not realize doorways are clickable. Artwork detail view requires awkward scrolling within the 3D space. No keyboard navigation support.
+
+### How to Use These Examples
+
+1. **Before scoring**: Re-read Example A (the floor) and Example C (the ceiling) to reset your internal scale
+2. **When uncertain about Design Quality**: Ask "Is this closer to Example A's assembled-from-parts feel, or Example B's cohesive editorial mood?"
+3. **When uncertain about Originality**: Ask "Would a human designer recognize deliberate choices here, like in Example C? Or would they say 'I've seen this exact output from ChatGPT' like Example A?"
+4. **Guard against inflation**: Example A's DQ=4 is for something that technically works and doesn't look broken. A 7 must be actively polished, like Example B. Reserve 9+ for genuine creative leaps like Example C.
+
 ## How Planner Should Use This
 
 When creating the visual design language section of a product spec:
 1. Choose a bold aesthetic direction from the tone options above
-2. Specify exact font choices, color palette, spacing philosophy
-3. Define animation approach and interaction patterns
-4. Include anti-patterns to avoid
-5. Set the bar high — the best designs are museum quality
+2. Reference a specific design from the Design Reference Library as an inspiration anchor (e.g., "Aim for Linear's spatial precision with Spotify's bold color energy")
+3. Specify exact font choices, color palette, spacing philosophy
+4. Define animation approach and interaction patterns
+5. Include anti-patterns to avoid
+6. Set the bar high — the best designs are museum quality
 
 ## How Frontend Evaluator Should Use This
 
 When scoring design quality and originality:
-1. Compare against the anti-patterns list — any match reduces the score
-2. Look for intentional design decisions vs. defaults
-3. Check if the design feels cohesive or assembled from parts
-4. Weight design quality and originality more heavily than craft and functionality
-5. Be skeptical — LLMs naturally want to praise LLM output
+1. **Re-read the Calibration Examples** before every scoring session to reset your scale
+2. Compare against the anti-patterns list — any match reduces the score
+3. Compare against the Design Reference Library — the best designs approach this level of intentionality
+4. Look for intentional design decisions vs. defaults
+5. Check if the design feels cohesive or assembled from parts
+6. Weight design quality and originality more heavily than craft and functionality
+7. Be skeptical — LLMs naturally want to praise LLM output

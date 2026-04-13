@@ -13,7 +13,7 @@ This plugin transforms a brief product description (1-4 sentences) into a workin
 ### Key Design Decisions
 
 - **Sprint decomposition** with context resets via handoff artifacts — works reliably within 200K context windows
-- **Adaptive execution mode** — Planner chooses SPRINT or CONTINUOUS mode based on project complexity; simple projects skip sprint decomposition entirely
+- **Three execution modes** — SPRINT (default), CONTINUOUS (simple projects), and CONTINUOUS-LITE (user opt-in for advanced models)
 - **Frontend/backend separation** — different generators and evaluators with domain-specific expertise
 - **Fullstack ordering** — backend sprints complete first, then frontend sprints (frontend can depend on backend APIs)
 - **Sprint contract negotiation** — evaluator reviews and co-negotiates sprint contracts before the generator builds, ensuring quality gates are meaningful
@@ -21,6 +21,11 @@ This plugin transforms a brief product description (1-4 sentences) into a workin
 - **Existing codebase awareness** — planner detects and adapts to existing projects rather than always starting from scratch
 - **AI-powered feature integration** — planner weaves AI features into specs; generators follow tool-use agent patterns via the ai-integration skill
 - **GAN-inspired architecture** — separating the agent that generates from the agent that evaluates solves the self-evaluation bias problem
+- **Browser automation via Playwright MCP** — evaluator interacts with running applications, takes mandatory screenshots as evidence
+- **Few-shot calibration** — evaluators use anchored scoring examples to prevent score drift across iterations
+- **Strategic feedback response** — generators make explicit Refine vs. Pivot (frontend) or Patch vs. Refactor (backend) decisions based on score trends
+- **Git discipline** — version control initialized at project start, commit conventions enforced, safety tags before fixes
+- **Design Reference Library** — 12 real-world design systems from [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) used for calibration and inspiration
 
 ## Installation
 
@@ -79,18 +84,19 @@ QA-evaluate an existing project:
 ```
 harness/
 ├── .claude-plugin/plugin.json    # Plugin manifest
+├── .mcp.json                     # Playwright MCP for browser automation
 ├── agents/
 │   ├── planner.md               # Product spec + sprint planning
-│   ├── frontend-generator.md    # Frontend implementation
-│   ├── backend-generator.md     # Backend implementation
-│   ├── frontend-evaluator.md    # Frontend QA (4-dimension scoring)
-│   └── backend-evaluator.md     # Backend QA (4-dimension scoring)
+│   ├── frontend-generator.md    # Frontend implementation (with Refine/Pivot strategy)
+│   ├── backend-generator.md     # Backend implementation (with Patch/Refactor strategy)
+│   ├── frontend-evaluator.md    # Frontend QA (4-dimension scoring + screenshots)
+│   └── backend-evaluator.md     # Backend QA (4-dimension scoring + calibration)
 ├── skills/
 │   ├── harness-build/SKILL.md   # Main entry: full pipeline orchestration
 │   ├── harness-plan/SKILL.md    # Planning only
 │   ├── harness-evaluate/SKILL.md # Evaluation only
-│   ├── frontend-design/SKILL.md # Design standards (used by planner + evaluator)
-│   └── ai-integration/SKILL.md  # AI feature patterns + Anthropic API (used by planner + generators)
+│   ├── frontend-design/SKILL.md # Design standards + calibration examples + reference library
+│   └── ai-integration/SKILL.md  # AI feature patterns + Anthropic API
 ├── settings.json
 └── README.md
 ```
@@ -113,6 +119,7 @@ Agents communicate through `harness-artifacts/`:
 | `frontend-handoff-sprint-{N}.md` | Frontend Generator | Frontend Generator (next sprint) |
 | `phase-handoff-backend-to-frontend.md` | Orchestrator | Frontend Generator (API contracts, env setup) |
 | `escalation-sprint-{ID}.md` | Orchestrator | User (manual intervention) |
+| `screenshots/sprint-{N}-*.png` | Frontend Evaluator | Frontend Generator (visual evidence of issues) |
 
 ### Evaluation Criteria
 
@@ -134,12 +141,23 @@ Agents communicate through `harness-artifacts/`:
 
 A sprint passes only if ALL dimensions meet their thresholds AND ≥80% of acceptance criteria pass.
 
+## What's New in v1.1.0
+
+- **Playwright MCP integration** — Frontend evaluator now uses Playwright for deterministic browser testing (with find-skills fallback)
+- **Mandatory screenshot evidence** — Evaluations must include at least 4 screenshots (landing, key flow, mobile, error state)
+- **Few-shot calibration examples** — Both frontend and backend evaluators have anchor examples with full score breakdowns to prevent score drift
+- **Refine vs. Pivot framework** — Frontend generator makes explicit strategic decisions based on score trends
+- **Patch vs. Refactor framework** — Backend generator chooses between targeted fixes and architectural restructuring
+- **Git Discipline** — Version control initialized at project start; commit conventions, safety tags, and revert strategies enforced
+- **Design Reference Library** — 12 real-world design systems from [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) as evaluation anchors
+- **CONTINUOUS-LITE mode** — Optional sprint-free execution for advanced models, only when user explicitly requests
+
 ## References
 
-- [Harness Design for Long-Running Apps](https://www.anthropic.com/engineering/harness-design-long-running-apps) — Anthropic Engineering
-- [Effective Harnesses for Long-Running Agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents) — Earlier harness work
+- [Harness Design for Long-Running Apps](https://www.anthropic.com/engineering/harness-design-long-running-apps) — Anthropic Engineering (Mar 2026)
+- [Effective Harnesses for Long-Running Agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents) — Anthropic Engineering (Nov 2025)
 - [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) — Design principles
-- [Frontend Design Skill](https://github.com/anthropics/claude-code/blob/main/plugins/frontend-design/skills/frontend-design/SKILL.md) — Anthropic's official frontend design skill
+- [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) — Design system references for calibration
 
 ## License
 

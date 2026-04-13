@@ -31,9 +31,17 @@ User Input → Planner → [Generator ↔ Evaluator]×sprints → Done
    - Expected output: `harness-artifacts/spec.md` containing project classification, execution mode, features, and sprint plan
 3. Read `harness-artifacts/spec.md` and extract:
    - `Project Classification`: FRONTEND, BACKEND, or FULLSTACK
-   - `Execution Mode`: SPRINT or CONTINUOUS
+   - `Execution Mode`: SPRINT or CONTINUOUS (or CONTINUOUS-LITE if user specified)
    - `Sprint Plan`: the ordered list of sprints
-4. Initialize the pipeline state file `harness-artifacts/pipeline-state.md`:
+4. **Initialize version control** (if not already a git repo):
+   ```bash
+   git init
+   # Create a sensible .gitignore for the project type
+   echo 'node_modules/\n.env\n.env.local\ndist/\nbuild/\n*.log\n.DS_Store\nharness-artifacts/screenshots/' > .gitignore
+   git add -A
+   git commit -m "harness: initialize project"
+   ```
+5. Initialize the pipeline state file `harness-artifacts/pipeline-state.md`:
    ```markdown
    # Pipeline State — {Project Name}
 
@@ -61,6 +69,12 @@ User Input → Planner → [Generator ↔ Evaluator]×sprints → Done
 
 Read `Execution Mode` from the spec:
 
+| Mode | When to Use | How It Works |
+|------|-------------|-------------|
+| **SPRINT** | Default for all projects. Used with 200K context models. | Sprint-by-sprint with negotiate→build→evaluate cycles |
+| **CONTINUOUS** | For projects ≤ 4 features in a single sprint | Single comprehensive sprint contract, single build pass, single evaluation pass |
+| **CONTINUOUS-LITE** | Only when user explicitly requests. For advanced models with long context. | No sprint contracts. Generator builds the full app freely, then single end-pass QA. |
+
 - **SPRINT**: Follow Phase 2 and Phase 3 as documented (sprint-by-sprint execution).
 - **CONTINUOUS**:
   1. Write a single comprehensive sprint contract covering the full scope.
@@ -69,6 +83,18 @@ Read `Execution Mode` from the spec:
   4. If evaluation fails, iterate (generator reads feedback, re-implements, re-evaluates).
   5. Apply the same STALL DETECTION rules from Phase 3 step 5.
   6. Proceed to Phase 4 on pass.
+- **CONTINUOUS-LITE** (only when explicitly requested by user or spec):
+  1. Skip sprint contract negotiation entirely.
+  2. Delegate the full `spec.md` directly to the generator with instruction:
+     "Build the complete application according to the spec. Work feature by feature,
+     committing after each feature. Take your time — comprehensive working code matters
+     more than speed."
+  3. After the generator declares completion, delegate to the evaluator for a single end-pass QA.
+  4. If evaluation fails:
+     - Generator reads the full evaluation feedback and fixes issues.
+     - Re-evaluate.
+     - Apply STALL DETECTION if 3+ failures with no score improvement.
+  5. Proceed to Phase 4 on pass.
 
 ### Phase 2: Execution
 
