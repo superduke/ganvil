@@ -1,5 +1,9 @@
 # Ganvil — Autonomous Coding Harness for Claude Code
 
+> **From a one-line brief to a shipped app — forged in a generator ↔ evaluator clash.**
+>
+> *ganvil* = **GAN** + **anvil**: a generator and evaluator hammer each sprint toward a quality bar.
+
 A long-running autonomous coding harness with **Planner → Generator ↔ Evaluator** architecture and Sprint decomposition, inspired by [Anthropic's harness design research](https://www.anthropic.com/engineering/harness-design-long-running-apps).
 
 ## What It Does
