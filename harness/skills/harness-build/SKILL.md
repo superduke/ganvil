@@ -35,7 +35,7 @@ User Input → Planner → [Generator ↔ Evaluator]×sprints → Done
    - `Sprint Plan`: the ordered list of sprints
 4. **Initialize version control** (if not already a git repo):
    ```bash
-   git init
+   git init -b main
    # Create a sensible .gitignore for the project type
    printf 'node_modules/\n.env\n.env.local\ndist/\nbuild/\n*.log\n.DS_Store\nharness-artifacts/screenshots/\n' > .gitignore
    git add -A
@@ -232,6 +232,7 @@ loop:
 ```
 - **Background dispatch is the only thing that makes this parallel.** Blocking dispatch would serialize B1→B3 inside two worktrees — all the complexity, zero wall-clock gain. If background dispatch is unavailable, fall back to `SPRINT`.
 - **All `team-scheduler` calls are serial** (single writer of pipeline-state.md). Background generators must NOT call `team-scheduler`.
+- **Stall data contract (for `stall-recommend`):** after each evaluator round, append that round's weighted W (`W = 2×HIGH + 1×STD`) to the sprint's `W History` column (slash-list, most-recent-last) and bump `Stall` on FAIL (reset `Stall` to 0 on PASS). `stall-recommend` then applies A8 = **3 consecutive FAILs AND last-2-rounds ΔW ≤ 0**; with fewer than 3 W samples it falls back to the counter alone.
 - **Runtime isolation:** each generator/evaluator reads `sprint-{id}-lease.json` → independent `DB`, `Port`, `DataDir`, works inside its `Worktree` with absolute paths (no `cd`). Two backend branches migrating separate DBs won't collide.
 
 **Integration smoke + fix-forward (after a wave's merges):** when `team-scheduler wave-done?` is true, on `main` run the project build, start server(s), hit health + key API endpoints, load the frontend first screen (Playwright). On failure → **fix-forward**: append a corrective serial sprint on `main` (depends on the merged set), generator input = smoke report, budget-capped at 3 iterations (reuse `stall-recommend`). Do NOT revert or bisect-attribute across merged branches — main only moves forward.

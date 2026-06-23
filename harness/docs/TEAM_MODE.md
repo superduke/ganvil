@@ -262,6 +262,8 @@ loop:
 **改善口径（全模式统一）**：`W = 2 × (HIGH 维) + 1 × (STANDARD 维)`；"有改善" = `W` 严格 `>` 上一轮。
 
 > **前端 W 构成（[`EVAL_REWORK.md`](./EVAL_REWORK.md) B10 耦合点）**：前端现为 5 维——HIGH: Design Quality / Originality / **Functional Completeness**；STANDARD: Craft / UX-Usability——故 `W_frontend = 2·(DQ + OG + FuncComp) + 1·(Craft + UX)`。
+>
+> ⚠️ **W 不跨层比较**：前端 W 满分权重为 **8**（3 HIGH + 2 STD），后端为 **6**（2 HIGH + 2 STD）。stall 只在**同一分支的历次迭代间**比较（同公式同层），故该不对称无害；绝不要把前端 W 与后端 W 直接比大小。
 
 **per-branch stall**：某分支连 3 次 FAIL **且** 最近 2 轮 `W` 增量 ≤ 0 → `stall-recommend` 返回 `scope-reduce | escalate`；**不阻塞兄弟分支**；每分支独立 `Stall` 计数。（fix-forward 复用此机制做预算封顶。）
 

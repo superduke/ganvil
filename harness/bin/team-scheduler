@@ -33,6 +33,18 @@ function out(obj) { process.stdout.write(JSON.stringify(obj) + '\n'); }
 function log(msg) { process.stderr.write('[team-scheduler] ' + msg + '\n'); }
 function fail(msg, code = 1) { out({ ok: false, error: msg }); process.exit(code); }
 
+// Integration branch — derived, never hardcoded, so repos on machines with
+// init.defaultBranch=master (or anything else) don't silently break allocate/merge.
+let _defaultBranch;
+function defaultBranch() {
+  if (_defaultBranch === undefined) {
+    try { _defaultBranch = git(['symbolic-ref', '--short', 'HEAD']).trim(); } catch {}
+    if (!_defaultBranch) { try { _defaultBranch = git(['config', '--get', 'init.defaultBranch']).trim(); } catch {} }
+    if (!_defaultBranch) _defaultBranch = 'main';
+  }
+  return _defaultBranch;
+}
+
 // ---------- pipeline-state.md parse / serialize ----------
 // Tolerant: any markdown table whose header row contains "Sprint" and "Status".
 function readState() {
@@ -78,19 +90,18 @@ function normalize(o) {
     taskid: blank(o['TaskID']),
     iter: parseInt(o['Iter'] || '0', 10) || 0,
     scores: blank(o['Last Scores']),
+    whist: blank(o['W History']),          // weighted W per iteration, slash-separated
     stall: parseInt(o['Stall'] || '0', 10) || 0,
     notes: o['Notes'] || '',
   };
 }
-const COLS = ['Sprint','Deps','Status','Wave','Worktree','Branch','DB','Port','TaskID','Iter','Last Scores','Stall','Notes'];
+const COLS = ['Sprint','Deps','Status','Wave','Worktree','Branch','DB','Port','TaskID','Iter','Last Scores','W History','Stall','Notes'];
 function writeState(rows) {
   const val = r => [
-    r.id, `[${(r.depos||r.deps||[]).join(',')}]`, r.status, r.wave,
+    r.id, `[${(r.deps||[]).join(',')}]`, r.status, r.wave,
     r.worktree||'-', r.branch||'-', r.db||'-', r.port||'-', r.taskid||'-',
-    r.iter, r.scores||'-', r.stall, r.notes||'-'
+    r.iter, r.scores||'-', r.whist||'-', r.stall, r.notes||'-'
   ];
-  // normalize: ensure `deps` field used by serializer
-  rows = rows.map(r => ({ ...r, depos: r.deps }));
   const header = '| ' + COLS.join(' | ') + ' |';
   const sep    = '| ' + COLS.map(() => '---').join(' | ') + ' |';
   const body   = rows.map(r => '| ' + val(r).map(c => String(c)).join(' | ') + ' |');
@@ -112,12 +123,13 @@ function depsFromSpec() {
   return m;
 }
 function reconcileWithGit(rows) {
-  // Self-heal: a sprint whose branch is an ancestor of main ⇒ MERGED.
+  // Self-heal: a sprint whose branch is an ancestor of the integration branch ⇒ MERGED.
+  const base = defaultBranch();
   for (const r of rows) {
     if (r.status === 'MERGED') continue;
     if (!r.branch) continue;
     try {
-      git(['merge-base', '--is-ancestor', r.branch, 'main']);
+      git(['merge-base', '--is-ancestor', r.branch, base]);
       r.status = 'MERGED'; r.worktree = ''; r.port = 0; r.db = '';
     } catch { /* not merged yet */ }
   }
@@ -129,18 +141,20 @@ function depSatisfied(rows, dep) {
 }
 
 // ---------- port / db allocation ----------
+// Port probing is async: EADDRINUSE arrives as an 'error' event, not a sync
+// throw — so a try/catch around listen() can never catch it. Bind+listen and
+// resolve false on error, true once listening (then release the handle).
 function isPortFree(p) {
-  try {
+  return new Promise(resolve => {
     const srv = net.createServer();
-    srv.listen(p, '127.0.0.1');
-    srv.close();
-    return true;
-  } catch { return false; }
+    srv.once('error', () => { srv.close(); resolve(false); });
+    srv.listen(p, '127.0.0.1', () => srv.close(() => resolve(true)));
+  });
 }
-function nextPort(rows) {
+async function nextPort(rows) {
   const used = new Set(rows.map(r => r.port).filter(Boolean));
   for (let p = PORT_MIN; p <= PORT_MAX; p++) {
-    if (!used.has(p) && isPortFree(p)) return p;
+    if (!used.has(p) && await isPortFree(p)) return p;
   }
   return 0;
 }
@@ -156,20 +170,24 @@ function cmdInit(phase) {
     else rows.find(r => r.id === id).deps = deps;
   }
   rows = reconcileWithGit(rows);
-  // Orphan worktree cleanup: worktrees not recorded and without escalate tag.
+  // Orphan worktree cleanup: remove worktrees neither recorded nor escalate-tagged.
+  // Skip the main worktree (== cwd) and normalize paths to absolute — `git worktree
+  // list` prints absolute paths while pipeline-state stores relative ../harness-wt-*,
+  // so a naive Set compare never matched (and would have nuked live worktrees on resume).
   let wtList = [];
   try { wtList = git(['worktree', 'list']).split('\n').filter(Boolean); } catch {}
-  const recorded = new Set(rows.map(r => r.worktree).filter(Boolean));
-  const escalateTags = new Set(git(['tag', '-l', 'escalate-*']).split('\n').filter(Boolean).map(s => s.trim()));
+  const recorded = new Set(rows.map(r => r.worktree).filter(Boolean).map(p => path.resolve(p)));
+  const escalateIds = new Set(git(['tag', '-l', 'escalate-*']).split('\n').filter(Boolean).map(s => s.trim().replace(/^escalate-/, '')));
+  const mainPath = path.resolve(process.cwd());
   const cleaned = [];
   for (const line of wtList) {
-    const wtPath = line.split(/\s+/)[0];
-    if (wtPath && !recorded.has(wtPath) && !wtPath.endsWith(path.sep + '.git')) {
-      // keep if its branch has an escalate tag
-      let keep = false;
-      try { const br = git(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: wtPath }); keep = escalateTags.has(br.trim()); } catch {}
-      if (!keep) { try { git(['worktree', 'remove', '--force', wtPath]); cleaned.push(wtPath); } catch (e) { log('could not remove ' + wtPath + ': ' + e.message); } }
-    }
+    const wtPath = path.resolve(line.split(/\s+/)[0]);
+    if (!wtPath || wtPath === mainPath) continue;            // never touch the main worktree
+    if (recorded.has(wtPath)) continue;                      // still in use by a live sprint
+    // keep if this worktree's sprint was escalated: branch backend/B1 → id B1 → tag escalate-B1
+    let keep = false;
+    try { const br = git(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: wtPath }).trim(); keep = escalateIds.has(br.split('/').pop()); } catch {}
+    if (!keep) { try { git(['worktree', 'remove', '--force', wtPath]); cleaned.push(wtPath); } catch (e) { log('could not remove ' + wtPath + ': ' + e.message); } }
   }
   writeState(rows);
   out({ ok: true, phase, sprints: rows.length, cleaned });
@@ -185,7 +203,7 @@ function cmdNext(cap = DEFAULT_CAP) {
   out({ ok: true, runnable, running, wave, cap });
 }
 
-function cmdAllocate(id) {
+async function cmdAllocate(id) {
   const rows = readState();
   const r = rows.find(x => x.id === id);
   if (!r) fail('unknown sprint ' + id, 2);
@@ -193,10 +211,20 @@ function cmdAllocate(id) {
   const phase = /^[BF]/.test(id) ? (id.startsWith('B') ? 'backend' : 'frontend') : 'single';
   const branch = `${phase}/${id}`;
   const wt = path.join('..', `harness-wt-${phase}-${id}`);
-  try { git(['worktree', 'add', wt, '-b', branch, 'main']); }
-  catch (e) { fail('worktree add failed: ' + (e.message || ''), 2); }
-  const port = nextPort(rows);
-  if (!port) { try { git(['worktree', 'remove', '--force', wt]); } catch {}; fail('no free port in range', 2); }
+  try { git(['worktree', 'add', wt, '-b', branch, defaultBranch()]); }
+  catch (e) {
+    // `worktree add -b` may have created the branch before failing — drop both so a
+    // retry (or a later port-exhaustion rerun) isn't poisoned by a stale branch.
+    try { git(['worktree', 'remove', '--force', wt]); } catch {}
+    try { git(['branch', '-D', branch]); } catch {}
+    fail('worktree add failed: ' + (e.message || ''), 2);
+  }
+  const port = await nextPort(rows);
+  if (!port) {
+    try { git(['worktree', 'remove', '--force', wt]); } catch {}
+    try { git(['branch', '-D', branch]); } catch {}      // reclaim the branch created by `add -b`
+    fail('no free port in range', 2);
+  }
   const db = dbName(id);
   const datadir = path.join(wt, 'var');
   Object.assign(r, { status: 'RUNNING', worktree: wt, branch, db, port, wave: r.wave || 1, iter: r.iter || 1 });
@@ -232,26 +260,44 @@ function cmdMerge(id) {
   if (!r.branch) fail('no branch for ' + id, 2);
   try { git(['merge', '--no-ff', '-m', `harness: merge ${id}`, r.branch]); }
   catch (e) { fail('git merge failed (conflict?): ' + (e.message || ''), 1); }
-  r.status = 'MERGED'; r.worktree = ''; r.port = 0; r.db = ''; r.taskid = '';
-  try { git(['worktree', 'remove', r.worktree || path.join('..', `harness-wt-${r.branch.split('/')[0]}-${id}`)]); } catch (e) { log('worktree remove note: ' + e.message); }
+  // remove the worktree BEFORE clearing the field (the old clear-then-use always
+  // fell through to the reconstructed fallback by accident).
+  const wtToRemove = r.worktree || path.join('..', `harness-wt-${r.branch.split('/')[0]}-${id}`);
+  r.status = 'MERGED'; r.port = 0; r.db = ''; r.taskid = ''; r.worktree = '';
+  try { git(['worktree', 'remove', wtToRemove]); } catch (e) { log('worktree remove note: ' + e.message); }
   writeState(rows);
-  const unblocked = rows.filter(x => x.status === 'PENDING' && x.deps.every(d => depSatisfied([...rows, r], d))).map(x => x.id);
+  const unblocked = rows.filter(x => x.status === 'PENDING' && x.deps.every(d => depSatisfied(rows, d))).map(x => x.id);
   out({ ok: true, id, merged: true, unblocked });
 }
 
+// "7/7/7/8" → numeric sum (rough proxy only; the weighted W used for stall is W History).
 function parseW(scores) {
-  // "7/7/7/8" → numeric sum proxy; treat as 0 if unparsable.
   const nums = (scores || '').split('/').map(Number).filter(n => !isNaN(n));
   return nums.reduce((a, b) => a + b, 0);
+}
+function parseWhist(s) {
+  return (s || '').split('/').map(Number).filter(n => !isNaN(n));
 }
 function cmdStall(id) {
   const rows = readState();
   const r = rows.find(x => x.id === id);
   if (!r) fail('unknown sprint ' + id, 2);
-  let recommend = 'iterate';
-  let reason = 'fewer than 3 failures or W still improving';
-  if (r.stall >= 3) { recommend = r.deps.length ? 'scope-reduce' : 'escalate'; reason = `3+ failures, stall=${r.stall}`; }
-  out({ ok: true, id, recommend, reason, iter: r.iter, stall: r.stall, lastW: parseW(r.scores) });
+  const wh = parseWhist(r.whist);                 // weighted W per iteration, most-recent-last
+  const fails = r.stall;                           // orchestrator bumps per FAIL
+  // A8: stalled = 3 consecutive FAILs AND last 2 rounds' ΔW ≤ 0 (i.e. not strictly improving).
+  let stalled = false, reason;
+  if (wh.length >= 3) {
+    const d1 = wh[wh.length - 1] - wh[wh.length - 2];
+    const d2 = wh[wh.length - 2] - wh[wh.length - 3];
+    stalled = fails >= 3 && d1 <= 0 && d2 <= 0;
+    reason = `fails=${fails}, ΔW(last2)=${d1},${d2}`;
+  } else {
+    // No weighted-W history yet (older pipeline-state): fall back to counter-only.
+    stalled = fails >= 3;
+    reason = `fails=${fails}, W history incomplete (${wh.length}/3) — counter-only`;
+  }
+  const recommend = stalled ? (r.deps.length ? 'scope-reduce' : 'escalate') : 'iterate';
+  out({ ok: true, id, recommend, reason, iter: r.iter, stall: r.stall, whist: wh, lastW: wh.length ? wh[wh.length - 1] : parseW(r.scores) });
 }
 
 function cmdWaveDone() {
@@ -274,19 +320,23 @@ function cmdStatus() {
 
 // ---------- dispatch ----------
 const [, , cmd, ...rest] = process.argv;
-try {
+function dispatch() {
   switch (cmd) {
-    case 'init': cmdInit(rest[0] || 'all'); break;
-    case 'next': cmdNext(parseInt(rest[0] || String(DEFAULT_CAP), 10)); break;
-    case 'allocate': cmdAllocate(rest[0]); break;
-    case 'bind': cmdBind(rest[0], rest[1]); break;
-    case 'lookup': cmdLookup(rest[0]); break;
-    case 'merge': cmdMerge(rest[0]); break;
-    case 'stall-recommend': cmdStall(rest[0]); break;
-    case 'wave-done?': cmdWaveDone(); break;
-    case 'status': cmdStatus(); break;
+    case 'init': return cmdInit(rest[0] || 'all');
+    case 'next': return cmdNext(parseInt(rest[0] || String(DEFAULT_CAP), 10));
+    case 'allocate': return cmdAllocate(rest[0]);     // async — returns a promise
+    case 'bind': return cmdBind(rest[0], rest[1]);
+    case 'lookup': return cmdLookup(rest[0]);
+    case 'merge': return cmdMerge(rest[0]);
+    case 'stall-recommend': return cmdStall(rest[0]);
+    case 'wave-done?': return cmdWaveDone();
+    case 'status': return cmdStatus();
     default: fail('unknown command: ' + cmd + ' (expected: init|next|allocate|bind|lookup|merge|stall-recommend|wave-done?|status)', 2);
   }
+}
+try {
+  // dispatch() may return a promise (allocate) — catch both sync throws and async rejections.
+  Promise.resolve(dispatch()).catch(e => fail(e.message || String(e), e.gitcode === 0 ? 1 : 2));
 } catch (e) {
   fail(e.message || String(e), e.gitcode === 0 ? 1 : 2);
 }
