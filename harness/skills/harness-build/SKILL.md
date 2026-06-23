@@ -1,5 +1,5 @@
 ---
-name: harness-build
+name: build
 description: >
   Full harness build pipeline. Takes a brief product description and autonomously
   builds the complete application using the Planner-Generator-Evaluator architecture
@@ -37,7 +37,7 @@ User Input → Planner → [Generator ↔ Evaluator]×sprints → Done
    ```bash
    git init
    # Create a sensible .gitignore for the project type
-   echo 'node_modules/\n.env\n.env.local\ndist/\nbuild/\n*.log\n.DS_Store\nharness-artifacts/screenshots/' > .gitignore
+   printf 'node_modules/\n.env\n.env.local\ndist/\nbuild/\n*.log\n.DS_Store\nharness-artifacts/screenshots/\n' > .gitignore
    git add -A
    git commit -m "harness: initialize project"
    ```
@@ -74,8 +74,10 @@ Read `Execution Mode` from the spec:
 | **SPRINT** | Default for all projects. Used with 200K context models. | Sprint-by-sprint with negotiate→build→evaluate cycles |
 | **CONTINUOUS** | For projects ≤ 4 features in a single sprint | Single comprehensive sprint contract, single build pass, single evaluation pass |
 | **CONTINUOUS-LITE** | Only when user explicitly requests. For advanced models with long context. | No sprint contracts. Generator builds the full app freely, then single end-pass QA. |
+| **SPRINT-TEAM** | Planner marked the spec TEAM-eligible AND `userConfig.defaultParallelism` permits AND worktrees + background dispatch are available. | Phase 3' — dependency-closed waves of parallel sprints, each in its own worktree, via `bin/team-scheduler`. |
 
 - **SPRINT**: Follow Phase 2 and Phase 3 as documented (sprint-by-sprint execution).
+- **SPRINT-TEAM**: Follow Phase 2 for planning, then execute via **Phase 3'** (parallel waves). Use only when the planner marked the spec `SPRINT-TEAM`, `userConfig.defaultParallelism` is not `always-serial`, and worktree + background dispatch are available; otherwise treat as `SPRINT`.
 - **CONTINUOUS**:
   1. Write a single comprehensive sprint contract covering the full scope.
   2. Delegate to the generator for a single implementation pass.
@@ -171,7 +173,8 @@ Update it: set the current sprint's Status to `IN_PROGRESS`, Iteration to 1.
      Go to step 5 (STALL DETECTION)
 
 5. STALL DETECTION: Check pipeline-state.md Score Trend for the current sprint
-   → If this is the 3rd+ consecutive failure AND scores have not improved
+   → Improvement metric (统一改善口径, #11): W = 2×(HIGH-weight dims) + 1×(STANDARD-weight dims); "improved" = W strictly greater than the previous iteration's W.
+   → If this is the 3rd+ consecutive failure AND W has not improved
      across the last 2 iterations (stalled):
      
      a. SCOPE REDUCTION: Split the current sprint into two smaller sprints.
@@ -193,6 +196,49 @@ Update it: set the current sprint's Status to `IN_PROGRESS`, Iteration to 1.
      Go back to step 2 (BUILD). The generator reads the evaluation
      feedback and iterates on the fix.
 ```
+
+### Phase 3' — Parallel Sprint Execution (TEAM)
+
+When `Execution Mode: SPRINT-TEAM` and the orchestrator gate passes, execute the phase's sprints in dependency-closed waves instead of strictly serial. **At `C=1` this is identical to Phase 3** (the regression-safe baseline).
+
+**Division of labor:** you (orchestrator) decide escalate / scope-reduce / fix-forward; `bin/team-scheduler` (stateless) decides who runs and how to merge; generators and evaluators run as **background agents** in isolated worktrees.
+
+**Setup (once per phase):**
+```bash
+team-scheduler init <phase>     # re-derives state from git + pipeline-state.md; cleans orphan worktrees
+```
+Exits non-zero → fall back to serial `SPRINT` for the whole phase (main untouched; safe).
+
+**Wave loop (event-driven — "wait for any" = yield + completion notification):**
+```
+loop:
+  wave = team-scheduler next                     # JSON { runnable, running, cap }
+  if runnable empty and running empty and not wave-done? → write escalation, break
+  for s in wave.runnable (≤ C, default 2):
+     lease = team-scheduler allocate <s.id>       # worktree + DB + port; writes sprint-{id}-lease.json
+     tid   = dispatch <phase>-generator with the lease  (run_in_background: true)
+     team-scheduler bind <s.id> <tid>             # task↔sprint mapping (survives context compaction)
+  yield — this turn ends; the harness re-invokes you on each completion notification
+  on wake (DRAIN every completed task this wake, not just one):
+     for each completed task_id (serial — you are the single writer):
+        sprint = team-scheduler lookup <task_id>
+        generator done  → dispatch <phase>-evaluator in that worktree (background); bind
+        evaluator done  → read its ORCHESTRATOR-SUMMARY:
+            PASS → team-scheduler merge <sprint>          # enforces dependency-closed invariant
+                    if team-scheduler wave-done? → integration smoke (below)
+            FAIL → rec = team-scheduler stall-recommend <sprint>
+                    you judge: iterate | scope-reduce | escalate
+  loop
+```
+- **Background dispatch is the only thing that makes this parallel.** Blocking dispatch would serialize B1→B3 inside two worktrees — all the complexity, zero wall-clock gain. If background dispatch is unavailable, fall back to `SPRINT`.
+- **All `team-scheduler` calls are serial** (single writer of pipeline-state.md). Background generators must NOT call `team-scheduler`.
+- **Runtime isolation:** each generator/evaluator reads `sprint-{id}-lease.json` → independent `DB`, `Port`, `DataDir`, works inside its `Worktree` with absolute paths (no `cd`). Two backend branches migrating separate DBs won't collide.
+
+**Integration smoke + fix-forward (after a wave's merges):** when `team-scheduler wave-done?` is true, on `main` run the project build, start server(s), hit health + key API endpoints, load the frontend first screen (Playwright). On failure → **fix-forward**: append a corrective serial sprint on `main` (depends on the merged set), generator input = smoke report, budget-capped at 3 iterations (reuse `stall-recommend`). Do NOT revert or bisect-attribute across merged branches — main only moves forward.
+
+**Per-branch stall:** each branch has its own iteration/W trend; a stalled branch escalates or reduces on its own, siblings keep running.
+
+**Concurrency cap C:** default 2 (frontend Playwright/Chromium is heavy — wall-clock & memory bound, not CPU bound). Backend phases may use 2–3. `always-serial` forces C=1 (≡ Phase 3).
 
 ### Phase 4: Completion
 
@@ -237,6 +283,11 @@ Before each sprint, write `harness-artifacts/sprint-{ID}-contract.md`:
 7. **Be ambitious in contracts**. Push the acceptance criteria to match the ambition of the spec.
 8. **Adapt to existing codebases**. When a project already exists, plan to extend it rather than rebuild from scratch.
 9. **Protect your context window**. Follow the Context Management rules below strictly. Your ability to orchestrate a long build depends on not filling your context with information meant for other agents.
+10. **TEAM is phase-internal only.** Parallel sprints run in separate worktrees within one phase; cross-phase order stays backend → frontend.
+11. **Per-branch stall doesn't block siblings** — a stuck branch escalates on its own.
+12. **Never auto-resolve merge conflicts** (no `-X ours/theirs`); rebase onto main or serially re-run the branch.
+13. **main is always dependency-closed** — `team-scheduler merge` enforces it; a script failure freezes main (safe).
+14. **TEAM needs background dispatch.** Generators/evaluators run via `run_in_background: true` + completion notifications; if unavailable, fall back to `SPRINT`. Never block-dispatch in TEAM mode.
 
 ## Context Management (Critical for Long Builds)
 
@@ -247,6 +298,7 @@ Your context window is finite (~200K tokens). For large projects (5+ sprints), y
 | Artifact | When | How Much |
 |----------|------|----------|
 | `pipeline-state.md` | At every sprint start | FULL — this is your external memory |
+| `team-scheduler` JSON output | Each TEAM subcommand | One JSON object (short) — the script holds state, not you |
 | `spec.md` | Phase 1 only | Extract classification, mode, sprint list. Don't re-read later. |
 | `sprint-{ID}-contract-review.md` | After REVIEW step | First line only — just need APPROVED or REVISE |
 | `{frontend,backend}-evaluation.md` | CHECK step | ORCHESTRATOR-SUMMARY block only (~5 lines). Never the full report. |
@@ -263,4 +315,5 @@ Your context window is finite (~200K tokens). For large projects (5+ sprints), y
 1. **Before each sprint**: Read `pipeline-state.md` to reconstruct your current state. Don't rely on memory of previous sprints.
 2. **After each sprint step**: Update `pipeline-state.md` immediately with the latest status, scores, and iteration count.
 3. **After a sprint passes**: Mentally release all details of that sprint. Everything you need going forward is captured in `pipeline-state.md`.
-4. **At phase boundaries** (FULLSTACK only): Write the phase handoff artifact, then treat the new phase as a fresh start — reference `pipeline-state.md` and the phase handoff file, not individual sprint artifacts from the previous phase.
+4. **Mirror progress to TaskList (dual-write, #9)**: Create one TaskList task per sprint at phase start; update its status alongside `pipeline-state.md`. This is observability + groundwork for v1.2.0 TaskList-based parsing; the `ORCHESTRATOR-SUMMARY` comment remains the primary read path in serial mode.
+5. **At phase boundaries** (FULLSTACK only): Write the phase handoff artifact, then treat the new phase as a fresh start — reference `pipeline-state.md` and the phase handoff file, not individual sprint artifacts from the previous phase.

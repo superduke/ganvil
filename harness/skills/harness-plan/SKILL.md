@@ -1,5 +1,5 @@
 ---
-name: harness-plan
+name: plan
 description: >
   Generate a product specification from a brief description. Classifies the project
   as frontend/backend/fullstack, defines features, creates a visual design language

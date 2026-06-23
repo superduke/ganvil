@@ -143,6 +143,8 @@ Score rationale:
 ### Example C: 3D Art Gallery Experience (EXCEPTIONAL)
 **Scores: DQ=9, OG=10, CR=8, FN=6**
 
+> ⚠️ **Example C is a *design* ceiling, not a *product* ceiling.** It anchors Originality/Craft. A real app with C's functional gaps (FN=6: no keyboard nav, awkward scrolling, non-intuitive doorways) would now **FAIL on Functional Completeness** under the closed-loop standard — a persistence break or broken core loop is a hard veto regardless of how striking the visuals are. High DQ/OG cannot buy off a broken loop; see the frontend-evaluator's FuncComp calibration.
+
 What the evaluator observed:
 - CSS 3D perspective room with checkered marble floor rendered via CSS gradients
 - Artwork "hung" on walls using absolute positioning with transform: perspective()

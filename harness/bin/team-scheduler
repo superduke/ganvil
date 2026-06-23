@@ -1,0 +1,292 @@
+#!/usr/bin/env node
+// team-scheduler — stateless TEAM wave scheduler for the harness plugin.
+// Each invocation is a fresh process: it re-derives everything from
+//   <cwd>/harness-artifacts/pipeline-state.md  +  git  +  spec DAG
+// and writes only pipeline-state.md (+ lease files via allocate, git via merge).
+// Contract: one strict JSON object on stdout per command; human logs on stderr;
+// exit 0 = ok, 1 = recoverable (orchestrator falls back to SPRINT), 2 = fatal.
+// Stateless + single-writer (orchestrator calls us serially) ⇒ no file locking.
+
+const fs = require('fs');
+const path = require('path');
+const { execFileSync } = require('child_process');
+const net = require('net');
+
+const ARTIFACTS = path.join(process.cwd(), 'harness-artifacts');
+const STATE = path.join(ARTIFACTS, 'pipeline-state.md');
+const SPEC = path.join(ARTIFACTS, 'spec.md');
+const PORT_MIN = 8100;
+const PORT_MAX = 8199;
+const DEFAULT_CAP = 2;
+
+// ---------- low-level helpers ----------
+function git(args, opts = {}) {
+  try {
+    return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).toString();
+  } catch (e) {
+    throw new GitError(e.status, (e.stderr || e.stdout || '').toString().trim());
+  }
+}
+class GitError extends Error { constructor(code, msg) { super(msg); this.gitcode = code; } }
+
+function out(obj) { process.stdout.write(JSON.stringify(obj) + '\n'); }
+function log(msg) { process.stderr.write('[team-scheduler] ' + msg + '\n'); }
+function fail(msg, code = 1) { out({ ok: false, error: msg }); process.exit(code); }
+
+// ---------- pipeline-state.md parse / serialize ----------
+// Tolerant: any markdown table whose header row contains "Sprint" and "Status".
+function readState() {
+  if (!fs.existsSync(STATE)) return [];
+  const lines = fs.readFileSync(STATE, 'utf8').split('\n');
+  let headerIdx = -1, cols = [];
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t.startsWith('|')) continue;
+    const cells = t.split('|').map(c => c.trim()).filter((_, k, a) => k > 0 && k < a.length);
+    if (cells.includes('Sprint') && cells.includes('Status')) { headerIdx = i; cols = cells; break; }
+  }
+  if (headerIdx < 0) return [];
+  const rows = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t.startsWith('|')) { if (rows.length) break; else continue; }
+    const c = t.split('|').map(x => x.trim()).filter((_, k, a) => k > 0 && k < a.length);
+    if (c.join('').match(/^-+$/)) continue;          // separator row |---|
+    if (!c[0] || c[0].toLowerCase() === 'sprint') continue;
+    const obj = {};
+    cols.forEach((col, k) => { obj[col] = c[k] || ''; });
+    rows.push(normalize(obj));
+  }
+  // spec DAG is the source of truth for deps; mirror it into each row so every
+  // command sees correct dependencies without depending on `init` having run.
+  const specDeps = depsFromSpec();
+  for (const r of rows) if (specDeps[r.id]) r.deps = specDeps[r.id];
+  return rows;
+}
+function normalize(o) {
+  const blank = v => (v && v !== '-' ? v : '');
+  const depsRaw = (o['Deps'] || '').replace(/[\[\]]/g, '');
+  return {
+    id: o['Sprint'] || '',
+    deps: depsRaw ? depsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+    status: (o['Status'] || 'PENDING').toUpperCase(),
+    wave: parseInt(o['Wave'] || '0', 10) || 0,
+    worktree: blank(o['Worktree']),
+    branch: blank(o['Branch']),
+    db: blank(o['DB']),
+    port: parseInt(blank(o['Port']) || '0', 10) || 0,
+    taskid: blank(o['TaskID']),
+    iter: parseInt(o['Iter'] || '0', 10) || 0,
+    scores: blank(o['Last Scores']),
+    stall: parseInt(o['Stall'] || '0', 10) || 0,
+    notes: o['Notes'] || '',
+  };
+}
+const COLS = ['Sprint','Deps','Status','Wave','Worktree','Branch','DB','Port','TaskID','Iter','Last Scores','Stall','Notes'];
+function writeState(rows) {
+  const val = r => [
+    r.id, `[${(r.depos||r.deps||[]).join(',')}]`, r.status, r.wave,
+    r.worktree||'-', r.branch||'-', r.db||'-', r.port||'-', r.taskid||'-',
+    r.iter, r.scores||'-', r.stall, r.notes||'-'
+  ];
+  // normalize: ensure `deps` field used by serializer
+  rows = rows.map(r => ({ ...r, depos: r.deps }));
+  const header = '| ' + COLS.join(' | ') + ' |';
+  const sep    = '| ' + COLS.map(() => '---').join(' | ') + ' |';
+  const body   = rows.map(r => '| ' + val(r).map(c => String(c)).join(' | ') + ' |');
+  const md = `# Pipeline State\n\n## Sprint Progress\n\n${[header,sep,...body].join('\n')}\n`;
+  fs.writeFileSync(STATE, md);
+}
+
+// ---------- deps / readiness ----------
+function depsFromSpec() {
+  // Parse "## Sprint Dependency Graph" lines like "- B1: deps []"
+  const m = {};
+  if (!fs.existsSync(SPEC)) return m;
+  const txt = fs.readFileSync(SPEC, 'utf8');
+  const section = txt.split(/## Sprint Dependency Graph/)[1] || '';
+  for (const line of section.split('\n')) {
+    const mm = line.match(/^-\s+([A-Za-z0-9]+):\s*deps\s*\[([^\]]*)\]/);
+    if (mm) m[mm[1]] = mm[2].split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return m;
+}
+function reconcileWithGit(rows) {
+  // Self-heal: a sprint whose branch is an ancestor of main ⇒ MERGED.
+  for (const r of rows) {
+    if (r.status === 'MERGED') continue;
+    if (!r.branch) continue;
+    try {
+      git(['merge-base', '--is-ancestor', r.branch, 'main']);
+      r.status = 'MERGED'; r.worktree = ''; r.port = 0; r.db = '';
+    } catch { /* not merged yet */ }
+  }
+  return rows;
+}
+function depSatisfied(rows, dep) {
+  const d = rows.find(r => r.id === dep);
+  return !!d && d.status === 'MERGED';
+}
+
+// ---------- port / db allocation ----------
+function isPortFree(p) {
+  try {
+    const srv = net.createServer();
+    srv.listen(p, '127.0.0.1');
+    srv.close();
+    return true;
+  } catch { return false; }
+}
+function nextPort(rows) {
+  const used = new Set(rows.map(r => r.port).filter(Boolean));
+  for (let p = PORT_MIN; p <= PORT_MAX; p++) {
+    if (!used.has(p) && isPortFree(p)) return p;
+  }
+  return 0;
+}
+function dbName(id) { return 'harness_' + id.toLowerCase().replace(/[^a-z0-9]/g, '_'); }
+
+// ---------- commands ----------
+function cmdInit(phase) {
+  let rows = readState();
+  const specDeps = depsFromSpec();
+  // Ensure every spec sprint exists (id may be phase-prefixed B1/F1/S1).
+  for (const [id, deps] of Object.entries(specDeps)) {
+    if (!rows.find(r => r.id === id)) rows.push(normalize({ Sprint: id, Deps: `[${deps.join(',')}]`, Status: 'PENDING' }));
+    else rows.find(r => r.id === id).deps = deps;
+  }
+  rows = reconcileWithGit(rows);
+  // Orphan worktree cleanup: worktrees not recorded and without escalate tag.
+  let wtList = [];
+  try { wtList = git(['worktree', 'list']).split('\n').filter(Boolean); } catch {}
+  const recorded = new Set(rows.map(r => r.worktree).filter(Boolean));
+  const escalateTags = new Set(git(['tag', '-l', 'escalate-*']).split('\n').filter(Boolean).map(s => s.trim()));
+  const cleaned = [];
+  for (const line of wtList) {
+    const wtPath = line.split(/\s+/)[0];
+    if (wtPath && !recorded.has(wtPath) && !wtPath.endsWith(path.sep + '.git')) {
+      // keep if its branch has an escalate tag
+      let keep = false;
+      try { const br = git(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: wtPath }); keep = escalateTags.has(br.trim()); } catch {}
+      if (!keep) { try { git(['worktree', 'remove', '--force', wtPath]); cleaned.push(wtPath); } catch (e) { log('could not remove ' + wtPath + ': ' + e.message); } }
+    }
+  }
+  writeState(rows);
+  out({ ok: true, phase, sprints: rows.length, cleaned });
+}
+
+function cmdNext(cap = DEFAULT_CAP) {
+  const rows = readState();
+  const runnable = rows
+    .filter(r => r.status === 'PENDING' && r.deps.every(d => depSatisfied(rows, d)))
+    .map(r => r.id);
+  const running = rows.filter(r => r.status === 'RUNNING' || r.status === 'EVAL-PENDING').map(r => r.id);
+  const wave = Math.max(0, ...rows.map(r => r.wave)) || (runnable.length ? 1 : 0);
+  out({ ok: true, runnable, running, wave, cap });
+}
+
+function cmdAllocate(id) {
+  const rows = readState();
+  const r = rows.find(x => x.id === id);
+  if (!r) fail('unknown sprint ' + id, 2);
+  if (r.status !== 'PENDING' && r.status !== 'READY') fail('sprint ' + id + ' not allocatable (status ' + r.status + ')');
+  const phase = /^[BF]/.test(id) ? (id.startsWith('B') ? 'backend' : 'frontend') : 'single';
+  const branch = `${phase}/${id}`;
+  const wt = path.join('..', `harness-wt-${phase}-${id}`);
+  try { git(['worktree', 'add', wt, '-b', branch, 'main']); }
+  catch (e) { fail('worktree add failed: ' + (e.message || ''), 2); }
+  const port = nextPort(rows);
+  if (!port) { try { git(['worktree', 'remove', '--force', wt]); } catch {}; fail('no free port in range', 2); }
+  const db = dbName(id);
+  const datadir = path.join(wt, 'var');
+  Object.assign(r, { status: 'RUNNING', worktree: wt, branch, db, port, wave: r.wave || 1, iter: r.iter || 1 });
+  writeState(rows);
+  const lease = { id, worktree: path.resolve(wt), branch, db, port, datadir: path.resolve(datadir) };
+  fs.writeFileSync(path.join(ARTIFACTS, `sprint-${id}-lease.json`), JSON.stringify(lease, null, 2) + '\n');
+  out({ ok: true, ...lease });
+}
+
+function cmdBind(id, taskid) {
+  const rows = readState();
+  const r = rows.find(x => x.id === id);
+  if (!r) fail('unknown sprint ' + id, 2);
+  r.taskid = taskid;
+  writeState(rows);
+  out({ ok: true, id, taskid });
+}
+
+function cmdLookup(taskid) {
+  const rows = readState();
+  const r = rows.find(x => x.taskid === taskid);
+  if (!r) fail('no sprint bound to task ' + taskid, 1);
+  out({ ok: true, sprint: r.id, status: r.status, branch: r.branch, worktree: r.worktree });
+}
+
+function cmdMerge(id) {
+  const rows = readState();
+  const r = rows.find(x => x.id === id);
+  if (!r) fail('unknown sprint ' + id, 2);
+  // main dependency-closed invariant: every dep must already be MERGED.
+  const open = r.deps.filter(d => !depSatisfied(rows, d));
+  if (open.length) fail('merge refused: deps not in main: ' + open.join(','), 2);
+  if (!r.branch) fail('no branch for ' + id, 2);
+  try { git(['merge', '--no-ff', '-m', `harness: merge ${id}`, r.branch]); }
+  catch (e) { fail('git merge failed (conflict?): ' + (e.message || ''), 1); }
+  r.status = 'MERGED'; r.worktree = ''; r.port = 0; r.db = ''; r.taskid = '';
+  try { git(['worktree', 'remove', r.worktree || path.join('..', `harness-wt-${r.branch.split('/')[0]}-${id}`)]); } catch (e) { log('worktree remove note: ' + e.message); }
+  writeState(rows);
+  const unblocked = rows.filter(x => x.status === 'PENDING' && x.deps.every(d => depSatisfied([...rows, r], d))).map(x => x.id);
+  out({ ok: true, id, merged: true, unblocked });
+}
+
+function parseW(scores) {
+  // "7/7/7/8" → numeric sum proxy; treat as 0 if unparsable.
+  const nums = (scores || '').split('/').map(Number).filter(n => !isNaN(n));
+  return nums.reduce((a, b) => a + b, 0);
+}
+function cmdStall(id) {
+  const rows = readState();
+  const r = rows.find(x => x.id === id);
+  if (!r) fail('unknown sprint ' + id, 2);
+  let recommend = 'iterate';
+  let reason = 'fewer than 3 failures or W still improving';
+  if (r.stall >= 3) { recommend = r.deps.length ? 'scope-reduce' : 'escalate'; reason = `3+ failures, stall=${r.stall}`; }
+  out({ ok: true, id, recommend, reason, iter: r.iter, stall: r.stall, lastW: parseW(r.scores) });
+}
+
+function cmdWaveDone() {
+  const rows = readState();
+  const active = rows.filter(r => ['RUNNING', 'EVAL-PENDING', 'FIXING', 'BLOCKED-CONFLICT'].includes(r.status));
+  const pending = rows.filter(r => r.status === 'PENDING');
+  out({ ok: true, done: active.length === 0, active: active.map(r => r.id), pending: pending.length });
+}
+
+function cmdStatus() {
+  const rows = readState();
+  let invariantHolds = true;
+  for (const r of rows) {
+    if (r.status !== 'MERGED') continue;
+    const open = r.deps.filter(d => !depSatisfied(rows, d));
+    if (open.length) invariantHolds = false;
+  }
+  out({ ok: true, sprints: rows.map(r => ({ id: r.id, status: r.status, deps: r.deps })), mainInvariantHolds: invariantHolds });
+}
+
+// ---------- dispatch ----------
+const [, , cmd, ...rest] = process.argv;
+try {
+  switch (cmd) {
+    case 'init': cmdInit(rest[0] || 'all'); break;
+    case 'next': cmdNext(parseInt(rest[0] || String(DEFAULT_CAP), 10)); break;
+    case 'allocate': cmdAllocate(rest[0]); break;
+    case 'bind': cmdBind(rest[0], rest[1]); break;
+    case 'lookup': cmdLookup(rest[0]); break;
+    case 'merge': cmdMerge(rest[0]); break;
+    case 'stall-recommend': cmdStall(rest[0]); break;
+    case 'wave-done?': cmdWaveDone(); break;
+    case 'status': cmdStatus(); break;
+    default: fail('unknown command: ' + cmd + ' (expected: init|next|allocate|bind|lookup|merge|stall-recommend|wave-done?|status)', 2);
+  }
+} catch (e) {
+  fail(e.message || String(e), e.gitcode === 0 ? 1 : 2);
+}

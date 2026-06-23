@@ -13,7 +13,7 @@ This plugin transforms a brief product description (1-4 sentences) into a workin
 ### Key Design Decisions
 
 - **Sprint decomposition** with context resets via handoff artifacts — works reliably within 200K context windows
-- **Three execution modes** — SPRINT (default), CONTINUOUS (simple projects), and CONTINUOUS-LITE (user opt-in for advanced models)
+- **Four execution modes** — SPRINT (default, serial), SPRINT-TEAM (phase-internal parallelism via the stateless `team-scheduler`), CONTINUOUS (simple projects), and CONTINUOUS-LITE (user opt-in for advanced models)
 - **Frontend/backend separation** — different generators and evaluators with domain-specific expertise
 - **Fullstack ordering** — backend sprints complete first, then frontend sprints (frontend can depend on backend APIs)
 - **Sprint contract negotiation** — evaluator reviews and co-negotiates sprint contracts before the generator builds, ensuring quality gates are meaningful
@@ -123,13 +123,16 @@ Agents communicate through `harness-artifacts/`:
 
 ### Evaluation Criteria
 
-**Frontend** (scored 1-10, threshold in parentheses):
+**Frontend** (scored 1-10, threshold in parentheses) — five dimensions, with a Functional Completeness axis that checks features close end-to-end:
 | Dimension | Threshold | Weight | Focus |
 |-----------|-----------|--------|-------|
 | Design Quality | ≥7 | HIGH | Cohesive mood and identity |
 | Originality | ≥7 | HIGH | Custom decisions vs. templates |
+| **Functional Completeness** | ≥7 | HIGH | Feature loops close: UI → persistence (survives refresh) → reverse → failure |
 | Craft | ≥6 | Standard | Typography, spacing, color harmony |
-| Functionality | ≥7 | Standard | Usability and task completion |
+| UX-Usability | ≥7 | Standard | Usability and task completion |
+
+Frontend weighted improvement: `W = 2·(DQ + OG + FuncComp) + 1·(Craft + UX)`.
 
 **Backend** (scored 1-10, threshold in parentheses):
 | Dimension | Threshold | Weight | Focus |
@@ -140,6 +143,16 @@ Agents communicate through `harness-artifacts/`:
 | Functional Completeness | ≥7 | Standard | All features working |
 
 A sprint passes only if ALL dimensions meet their thresholds AND ≥80% of acceptance criteria pass.
+
+## What's New in v1.2.0
+
+- **TEAM mode (SPRINT-TEAM)** — phase-internal parallelism: independent sprints run concurrently in separate worktrees, scheduled by a stateless `bin/team-scheduler` (JSON + exit-code contract; `main` stays dependency-closed). Default `always-serial`; opt in via `userConfig.defaultParallelism = auto|always-team`. See [`docs/TEAM_MODE.md`](docs/TEAM_MODE.md).
+- **Frontend closed-loop evaluation** — new HIGH-weight Functional Completeness dimension backed by a Feature Loop Matrix (6 stages, incl. survives-refresh) and a persistence veto. Pretty-but-hollow apps now FAIL. See [`docs/EVAL_REWORK.md`](docs/EVAL_REWORK.md).
+- **Bugfixes (from v1.1.1)** — correct Playwright MCP package (`@playwright/mcp`), portable `.gitignore` generation, `/harness:build|plan|evaluate` invocations, explicit improvement metric `W`, TaskList progress mirroring.
+
+### When to Use TEAM Mode
+- ✅ Good fit: ≥4 sprints per phase with independent features (auth + reporting + analytics); microservices / multi-module; wall-clock sensitive.
+- ❌ Poor fit: chain dependencies (B2 needs B1's API); shared schema/config across sprints; tight token budgets (TEAM overlaps time, doesn't multiply tokens — but peak resource use rises with C); CONTINUOUS / CONTINUOUS-LITE.
 
 ## What's New in v1.1.0
 

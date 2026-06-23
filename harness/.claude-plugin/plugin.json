@@ -1,7 +1,7 @@
 {
   "name": "harness",
   "description": "Long-running autonomous coding harness with Planner-Generator-Evaluator architecture and Sprint decomposition. Builds complete applications from simple descriptions.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": {
     "name": "zhangyabei"
   },
@@ -13,5 +13,22 @@
     "sprint-decomposition",
     "fullstack",
     "multi-agent"
-  ]
+  ],
+  "skills": "./skills/",
+  "agents": [
+    "./agents/planner.md",
+    "./agents/backend-generator.md",
+    "./agents/backend-evaluator.md",
+    "./agents/frontend-generator.md",
+    "./agents/frontend-evaluator.md"
+  ],
+  "mcpServers": "./.mcp.json",
+  "userConfig": {
+    "defaultParallelism": {
+      "type": "enum",
+      "enum": ["always-serial", "auto", "always-team"],
+      "default": "always-serial",
+      "description": "TEAM parallel mode policy. First release defaults to always-serial; flip to auto once it's been dogfooded on real multi-branch projects."
+    }
+  }
 }

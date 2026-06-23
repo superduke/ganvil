@@ -1,5 +1,5 @@
 ---
-name: harness-evaluate
+name: evaluate
 description: >
   Evaluate existing code using the harness evaluation framework. Automatically
   determines if the project is frontend, backend, or fullstack and applies the
