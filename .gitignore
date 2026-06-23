@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Node tooling (tests, any local helper scripts)
+node_modules/
+*.log
+
+# oh-my-claudecode runtime state (per-project tooling — not part of the plugin)
+.omc/
+
+# Local backup archives
+*.zip

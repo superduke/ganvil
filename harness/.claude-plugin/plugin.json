@@ -14,15 +14,6 @@
     "fullstack",
     "multi-agent"
   ],
-  "skills": "./skills/",
-  "agents": [
-    "./agents/planner.md",
-    "./agents/backend-generator.md",
-    "./agents/backend-evaluator.md",
-    "./agents/frontend-generator.md",
-    "./agents/frontend-evaluator.md"
-  ],
-  "mcpServers": "./.mcp.json",
   "userConfig": {
     "defaultParallelism": {
       "type": "enum",
