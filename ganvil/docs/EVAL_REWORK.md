@@ -3,7 +3,7 @@
 > **Status:** IMPLEMENTED（Phase 1+2 已落地 v1.2.0；Phase 3 上游/回归随 v1.2.0 一并落入 planner + evaluator — 见 commit `1b9b1fa`）
 > **Target:** ganvil plugin — 评测改造 `v1.2.x`（建议独立 **PR-C**）
 > **Date:** 2026-06-22（实施 2026-06-23）
-> **Author:** zhangyabei
+> **Author:** superduke
 > **与 TEAM 的关系：** **正交**。本改造提升**串行与并行通用**的前端评测质量；唯一耦合点是 [`TEAM_MODE.md`](./TEAM_MODE.md) **A8 的 W-score**（前端 W 构成由本文 B10 重定义）。两者可独立开发，合并时对齐 A8 即可。
 
 ---

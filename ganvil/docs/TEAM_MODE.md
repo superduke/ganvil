@@ -3,7 +3,7 @@
 > **Status:** IMPLEMENTED（v1.2.0 已落地 — 见 commit `1b9b1fa` 初版 + `28e298e` 调度器正确性修复）
 > **Target:** ganvil plugin — bugfix `v1.1.1`，TEAM `v1.2.0`
 > **Date:** 2026-06-22（实施 2026-06-23）
-> **Author:** zhangyabei
+> **Author:** superduke
 
 **Rev 4 变更**（吸收第三轮评审，设计收敛）：
 - **点名并发机制**（A5b）：wave 内 generator 经 `run_in_background: true` 派发，orchestrator 派发后 **yield**、由"完成通知"唤醒——这才是"等任一返回"的真实含义。否则伪并发 = 串行住两个 worktree、**零 wall-clock 收益**。

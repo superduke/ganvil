@@ -62,4 +62,4 @@ v1.3.0. TEAM parallel mode (`SPRINT-TEAM`) ships serial-safe (at C=1 it's identi
 
 ## License
 
-MIT © zhangyabei
+MIT © superduke
