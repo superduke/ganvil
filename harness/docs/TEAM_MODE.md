@@ -1,8 +1,8 @@
 # TEAM 模式 — 设计规格与修改方案
 
-> **Status:** DRAFT（未实施，待评审）
+> **Status:** IMPLEMENTED（v1.2.0 已落地 — 见 commit `1b9b1fa` 初版 + `28e298e` 调度器正确性修复）
 > **Target:** harness plugin — bugfix `v1.1.1`，TEAM `v1.2.0`
-> **Date:** 2026-06-22
+> **Date:** 2026-06-22（实施 2026-06-23）
 > **Author:** zhangyabei
 
 **Rev 4 变更**（吸收第三轮评审，设计收敛）：
@@ -500,4 +500,4 @@ loop:
 
 ---
 
-*本文档为设计规格（Rev 4），尚未实施。实施前评审 Part A/B；确认后按 Part C 分批落地（先 PR-A 修 bug，再 PR-B 批次 1→2，批次 3 待主动 dogfood + 门禁）。*
+*本文档为设计规格（Rev 4），**已于 v1.2.0 落地**（批次 1→2 + 调度器正确性修复）。批次 3（真并行 dogfood + 合入门禁）仍按 Part C 待办：默认 `always-serial` 下并行路径尚未在真实多分支项目上验证。*

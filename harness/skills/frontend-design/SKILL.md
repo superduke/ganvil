@@ -160,12 +160,31 @@ Score rationale:
 - **CR=8**: The CSS perspective math is correct, animations are smooth, gradients render cleanly. The checkered floor pattern has some aliasing artifacts. Cursor changes work.
 - **FN=6**: Navigation works but isn't immediately intuitive. First-time users might not realize doorways are clickable. Artwork detail view requires awkward scrolling within the 3D space. No keyboard navigation support.
 
+### Example D: Beautiful but Hollow — Kanban that loses data on refresh (FAIL)
+**Scores: DQ=8, OG=7, CR=7, UX=7 — but Functional Completeness = 3 → FAIL**
+
+The visual antithesis of Example C's lesson: this one looks *almost* shippable, which is exactly why it's dangerous.
+
+What the evaluator observed:
+- A Kanban board with crisp column layout, tasteful card shadows, a coherent muted palette — genuinely polished surface (DQ=8)
+- Drag-and-drop is visually smooth; cards animate between columns with a satisfying spring (UX=7)
+- Create-card and edit-card modals work, validation messages appear on empty input
+- **But on a hard refresh, every card snaps back to its initial position — the board state was never persisted.** Drag/create/edit were optimistic-only updates against in-memory state; no localStorage, no API round-trip.
+
+Score rationale:
+- **DQ/OG/CR/UX all pass their thresholds** — the surface really is well-crafted.
+- **FuncComp=3**: the persistence stage (4) of every P0 feature is `🔗` (fake closed loop). Anti-inflation rule fires: *any P0 feature with persistence 🔗 → FuncComp ≤ 4.*
+- **Verdict: FAIL.** Aesthetics cannot buy off a broken core loop. The generator's correct response is **Wire** (connect a persistence layer, remove the optimistic-only fakery) — **not** a visual Pivot.
+
+> **The contrast that matters**: Example C scores FN=6 yet anchors the *design* ceiling — its gaps are usability rough edges, not fake loops. Example D scores DQ=8 yet **FAILS** — because a hollow persistence loop is a hard veto. Pretty ≠ done. See the frontend-evaluator's Feature Loop Matrix + FuncComp calibration for the scoring mechanics.
+
 ### How to Use These Examples
 
 1. **Before scoring**: Re-read Example A (the floor) and Example C (the ceiling) to reset your internal scale
 2. **When uncertain about Design Quality**: Ask "Is this closer to Example A's assembled-from-parts feel, or Example B's cohesive editorial mood?"
 3. **When uncertain about Originality**: Ask "Would a human designer recognize deliberate choices here, like in Example C? Or would they say 'I've seen this exact output from ChatGPT' like Example A?"
 4. **Guard against inflation**: Example A's DQ=4 is for something that technically works and doesn't look broken. A 7 must be actively polished, like Example B. Reserve 9+ for genuine creative leaps like Example C.
+5. **Don't let a polished surface buy off a broken loop** (Example D): any P0 feature whose persistence stage is `🔗` (optimistic-only / mocked / hardcoded) caps **Functional Completeness ≤ 4** and FAILs the sprint — regardless of how high DQ/OG/Craft score. Pretty is not done.
 
 ## How Planner Should Use This
 
