@@ -281,10 +281,10 @@ loop:
 ```json
 "userConfig": {
   "defaultParallelism": {
-    "type": "enum",
-    "enum": ["always-serial", "auto", "always-team"],
+    "type": "string",
+    "title": "Default parallelism mode",
     "default": "always-serial",
-    "description": "TEAM 并行模式策略。首版默认 always-serial；auto 在跑稳后改默认。"
+    "description": "TEAM 并行模式策略。取值：always-serial | auto | always-team。首版默认 always-serial；auto 在跑稳后改默认。"
   }
 }
 ```

@@ -16,10 +16,10 @@
   ],
   "userConfig": {
     "defaultParallelism": {
-      "type": "enum",
-      "enum": ["always-serial", "auto", "always-team"],
+      "type": "string",
+      "title": "Default parallelism mode",
       "default": "always-serial",
-      "description": "TEAM parallel mode policy. First release defaults to always-serial; flip to auto once it's been dogfooded on real multi-branch projects."
+      "description": "TEAM parallel mode policy. Allowed values: always-serial | auto | always-team. First release defaults to always-serial; flip to auto once it's been dogfooded on real multi-branch projects."
     }
   }
 }
