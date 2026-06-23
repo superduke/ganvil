@@ -3,7 +3,7 @@
   "description": "Long-running autonomous coding harness with Planner-Generator-Evaluator architecture and Sprint decomposition. Builds complete applications from simple descriptions.",
   "version": "1.3.0",
   "author": {
-    "name": "zhangyabei"
+    "name": "superduke"
   },
   "license": "MIT",
   "keywords": [
