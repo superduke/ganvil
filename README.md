@@ -1,5 +1,7 @@
 # Ganvil
 
+English | [中文](./README.zh-CN.md)
+
 > **From a one-line brief to a shipped app — forged in a generator ↔ evaluator clash.**
 >
 > *ganvil* = **GAN** + **anvil**: a generator and evaluator hammer each sprint toward a quality bar.
