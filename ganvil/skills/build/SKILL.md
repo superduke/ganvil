@@ -1,14 +1,14 @@
 ---
 name: build
 description: >
-  Full harness build pipeline. Takes a brief product description and autonomously
+  Full ganvil build pipeline. Takes a brief product description and autonomously
   builds the complete application using the Planner-Generator-Evaluator architecture
   with Sprint decomposition. Handles frontend, backend, and fullstack projects.
   Use when you want to build a complete application from a simple description.
 argument-hint: <product description in 1-4 sentences>
 ---
 
-# Harness Build — Full Autonomous Build Pipeline
+# Ganvil Build — Full Autonomous Build Pipeline
 
 You are the **orchestrator** of a multi-agent coding harness inspired by [Anthropic's harness design research](https://www.anthropic.com/engineering/harness-design-long-running-apps). Your job is to coordinate the Planner, Generator, and Evaluator agents to build a complete application from a brief user description.
 
@@ -24,12 +24,12 @@ User Input → Planner → [Generator ↔ Evaluator]×sprints → Done
 
 ### Phase 1: Planning
 
-1. Create the `harness-artifacts/` directory if it doesn't exist.
+1. Create the `ganvil-artifacts/` directory if it doesn't exist.
 2. Delegate to the **planner** agent with the user's description:
    - Input: `$ARGUMENTS`
    - Context: If the current directory contains an existing project (has `package.json`, `Cargo.toml`, `requirements.txt`, `go.mod`, etc.), include this in the delegation: "Note: there is an existing codebase in the working directory. Analyze it and plan to extend/modify it rather than building from scratch."
-   - Expected output: `harness-artifacts/spec.md` containing project classification, execution mode, features, and sprint plan
-3. Read `harness-artifacts/spec.md` and extract:
+   - Expected output: `ganvil-artifacts/spec.md` containing project classification, execution mode, features, and sprint plan
+3. Read `ganvil-artifacts/spec.md` and extract:
    - `Project Classification`: FRONTEND, BACKEND, or FULLSTACK
    - `Execution Mode`: SPRINT or CONTINUOUS (or CONTINUOUS-LITE if user specified)
    - `Sprint Plan`: the ordered list of sprints
@@ -37,11 +37,11 @@ User Input → Planner → [Generator ↔ Evaluator]×sprints → Done
    ```bash
    git init -b main
    # Create a sensible .gitignore for the project type
-   printf 'node_modules/\n.env\n.env.local\ndist/\nbuild/\n*.log\n.DS_Store\nharness-artifacts/screenshots/\n' > .gitignore
+   printf 'node_modules/\n.env\n.env.local\ndist/\nbuild/\n*.log\n.DS_Store\nganvil-artifacts/screenshots/\n' > .gitignore
    git add -A
-   git commit -m "harness: initialize project"
+   git commit -m "ganvil: initialize project"
    ```
-5. Initialize the pipeline state file `harness-artifacts/pipeline-state.md`:
+5. Initialize the pipeline state file `ganvil-artifacts/pipeline-state.md`:
    ```markdown
    # Pipeline State — {Project Name}
 
@@ -51,18 +51,15 @@ User Input → Planner → [Generator ↔ Evaluator]×sprints → Done
    Current Phase: {BACKEND|FRONTEND}  
 
    ## Sprint Progress
-   | Sprint | Status | Iterations | Scores (latest) | Notes |
-   |--------|--------|------------|------------------|-------|
-   | {ID} | PENDING | — | — | — |
+   | Sprint | Deps | Status | Wave | Worktree | Branch | DB | Port | TaskID | Iter | Last Scores | W History | Stall | Notes |
+   |--------|------|--------|------|----------|--------|----|------|--------|------|-------------|-----------|-------|-------|
+   | {ID} | [] | PENDING | 0 | - | - | - | - | - | 0 | - | - | 0 | - |
    ...
 
    ## Current Sprint
    ID: —
-   Iteration: 0
    Last Verdict: —
-   Last Scores: —
-   Score Trend: []
-   Stall Count: 0
+   (Per-sprint Iter / Last Scores / W History / Stall live in the table above — the single source of truth shared with `bin/team-scheduler`.)
    ```
 
 ### Phase 1.5: Determine Execution Strategy
@@ -110,7 +107,7 @@ Execute each backend sprint in order using the **backend-generator** and **backe
 
 #### For FULLSTACK projects:
 1. **First**: Execute ALL backend sprints in order (B1, B2, B3, ...) using backend-generator and backend-evaluator.
-2. **Phase boundary handoff**: After ALL backend sprints pass, write `harness-artifacts/phase-handoff-backend-to-frontend.md`:
+2. **Phase boundary handoff**: After ALL backend sprints pass, write `ganvil-artifacts/phase-handoff-backend-to-frontend.md`:
    ```markdown
    # Phase Handoff — Backend → Frontend
 
@@ -133,18 +130,18 @@ Execute each backend sprint in order using the **backend-generator** and **backe
 
 For each sprint, follow this cycle:
 
-**Before starting**: Read `harness-artifacts/pipeline-state.md` to get current state.
+**Before starting**: Read `ganvil-artifacts/pipeline-state.md` to get current state.
 Update it: set the current sprint's Status to `IN_PROGRESS`, Iteration to 1.
 
 ```
 1. NEGOTIATE: Sprint contract negotiation
-   a. DRAFT: Write initial sprint contract to harness-artifacts/sprint-{ID}-contract.md
+   a. DRAFT: Write initial sprint contract to ganvil-artifacts/sprint-{ID}-contract.md
       → List the proposed scope, acceptance criteria, and out-of-scope items
    b. REVIEW: Delegate to the evaluator agent with instruction:
-      "Review the sprint contract at harness-artifacts/sprint-{ID}-contract.md.
+      "Review the sprint contract at ganvil-artifacts/sprint-{ID}-contract.md.
        Assess whether the acceptance criteria are specific, testable, and
        comprehensive enough to verify the sprint goal. Write your feedback
-       to harness-artifacts/sprint-{ID}-contract-review.md with:
+       to ganvil-artifacts/sprint-{ID}-contract-review.md with:
        - APPROVED: if criteria are sufficient
        - REVISE: with specific suggestions for additions/modifications"
    c. FINALIZE: If REVISE, update the contract incorporating evaluator feedback.
@@ -164,15 +161,15 @@ Update it: set the current sprint's Status to `IN_PROGRESS`, Iteration to 1.
    (Do NOT read the full bug details, design critique, or security concerns —
     those are for the Generator to read on the next iteration.)
    → Extract: verdict, scores, criteria_passed, blockers
-   → Update pipeline-state.md: record scores, increment iteration count,
-     append to Score Trend
+   → Update pipeline-state.md: record scores (Last Scores), increment Iter,
+     append this round's weighted W to W History
    → IF verdict is PASS:
      Update pipeline-state.md: set sprint Status to PASS
      Proceed to next sprint
    → IF verdict is FAIL:
      Go to step 5 (STALL DETECTION)
 
-5. STALL DETECTION: Check pipeline-state.md Score Trend for the current sprint
+5. STALL DETECTION: Check pipeline-state.md W History for the current sprint
    → Improvement metric (统一改善口径, #11): W = 2×(HIGH-weight dims) + 1×(STANDARD-weight dims); "improved" = W strictly greater than the previous iteration's W.
    → If this is the 3rd+ consecutive failure AND W has not improved
      across the last 2 iterations (stalled):
@@ -184,7 +181,7 @@ Update it: set the current sprint's Status to `IN_PROGRESS`, Iteration to 1.
      
      b. If scope reduction is not feasible (sprint is already minimal):
         ESCALATE by writing a detailed diagnostic to
-        harness-artifacts/escalation-sprint-{ID}.md documenting:
+        ganvil-artifacts/escalation-sprint-{ID}.md documenting:
         - What was attempted across all iterations
         - Which specific criteria keep failing and why
         - A recommendation for manual intervention
@@ -192,7 +189,7 @@ Update it: set the current sprint's Status to `IN_PROGRESS`, Iteration to 1.
         Proceed to the next sprint.
    
    → Otherwise (scores still improving or fewer than 3 failures):
-     Update pipeline-state.md: increment Iteration, update Stall Count
+     Update pipeline-state.md: increment Iter, update Stall
      Go back to step 2 (BUILD). The generator reads the evaluation
      feedback and iterates on the fix.
 ```
@@ -218,7 +215,7 @@ loop:
      lease = team-scheduler allocate <s.id>       # worktree + DB + port; writes sprint-{id}-lease.json
      tid   = dispatch <phase>-generator with the lease  (run_in_background: true)
      team-scheduler bind <s.id> <tid>             # task↔sprint mapping (survives context compaction)
-  yield — this turn ends; the harness re-invokes you on each completion notification
+  yield — this turn ends; ganvil re-invokes you on each completion notification
   on wake (DRAIN every completed task this wake, not just one):
      for each completed task_id (serial — you are the single writer):
         sprint = team-scheduler lookup <task_id>
@@ -250,7 +247,7 @@ After all sprints pass:
 
 ## Sprint Contract Format
 
-Before each sprint, write `harness-artifacts/sprint-{ID}-contract.md`:
+Before each sprint, write `ganvil-artifacts/sprint-{ID}-contract.md`:
 
 ```markdown
 # Sprint Contract — {Sprint ID}: {Sprint Title}
@@ -278,7 +275,7 @@ Before each sprint, write `harness-artifacts/sprint-{ID}-contract.md`:
 1. **Never skip evaluation**. Every sprint (or continuous build) must be evaluated before declaring completion.
 2. **Detect stalls, don't cap iterations**. If scores are improving, keep iterating. If scores stall for 3+ attempts, apply scope reduction or escalation — but never impose a hard retry limit.
 3. **Negotiate contracts, don't dictate them**. The evaluator reviews contracts before the generator builds, ensuring quality gates are meaningful.
-4. **Maintain the artifact trail**. Every handoff, contract, contract review, build log, evaluation, escalation, and pipeline state must be written to `harness-artifacts/`.
+4. **Maintain the artifact trail**. Every handoff, contract, contract review, build log, evaluation, escalation, and pipeline state must be written to `ganvil-artifacts/`.
 5. **Let agents do their work**. Don't try to implement code yourself — delegate to the specialized agents.
 6. **For fullstack projects, backend first**. The frontend can depend on the backend APIs, but not vice versa.
 7. **Be ambitious in contracts**. Push the acceptance criteria to match the ambition of the spec.

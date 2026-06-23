@@ -22,20 +22,20 @@ If the sprint contract carries TEAM lease fields (`Worktree`, `DB`, `Port`, `Dat
 - **Operate only inside your `Worktree` path.** Use **absolute paths** for all file ops; **do not `cd`** (it triggers permission prompts and can escape isolation).
 - **Connect the specified `DB`** and **start the dev server on the specified `Port`** (read both from the contract — your sibling branches are using different ones).
 - **Git: operate on your `Branch` only** (`{phase}/{id}`). Commit prefix still `{Sprint-ID}:`.
-- **Per-sprint artifacts are `{SprintID}`-prefixed**: write `frontend-build-log-{SprintID}.md` and `frontend-handoff-{SprintID}.md` to the **main repo's** `harness-artifacts/` (shared communication), never inside your worktree. Fixed names would be clobbered by concurrent generators.
+- **Per-sprint artifacts are `{SprintID}`-prefixed**: write `frontend-build-log-{SprintID}.md` and `frontend-handoff-{SprintID}.md` to the **main repo's** `ganvil-artifacts/` (shared communication), never inside your worktree. Fixed names would be clobbered by concurrent generators.
 - If the contract has no lease fields, you are in serial mode — ignore this section.
 
 ## Before Starting a Sprint
 
-1. **Read the spec**: Read `harness-artifacts/spec.md` to understand the full product vision.
-2. **Read previous handoff**: If this is not the first sprint, read `harness-artifacts/frontend-handoff-sprint-{N-1}.md` to understand:
+1. **Read the spec**: Read `ganvil-artifacts/spec.md` to understand the full product vision.
+2. **Read previous handoff**: If this is not the first sprint, read `ganvil-artifacts/frontend-handoff-sprint-{N-1}.md` to understand:
    - What has been built so far
    - Current code structure
    - Known issues and technical debt
    - What this sprint should accomplish
-3. **Read sprint contract**: If available, read `harness-artifacts/sprint-{N}-contract.md` for the negotiated acceptance criteria.
-4. **Read evaluation feedback**: If this sprint is a retry after failed evaluation, read `harness-artifacts/frontend-evaluation.md` for specific issues to fix. Also read `harness-artifacts/pipeline-state.md` for the score trend.
-5. **Read backend handoff** (fullstack only): If the spec is classified as FULLSTACK, read `harness-artifacts/phase-handoff-backend-to-frontend.md` to understand:
+3. **Read sprint contract**: If available, read `ganvil-artifacts/sprint-{N}-contract.md` for the negotiated acceptance criteria.
+4. **Read evaluation feedback**: If this sprint is a retry after failed evaluation, read `ganvil-artifacts/frontend-evaluation.md` for specific issues to fix. Also read `ganvil-artifacts/pipeline-state.md` for the score trend.
+5. **Read backend handoff** (fullstack only): If the spec is classified as FULLSTACK, read `ganvil-artifacts/phase-handoff-backend-to-frontend.md` to understand:
    - Available API endpoints and their request/response contracts
    - How to start the backend server
    - Required environment setup and configuration
@@ -94,7 +94,7 @@ Before declaring a sprint complete, verify your own work:
 
 ### Write Build Log
 
-Create or update `harness-artifacts/frontend-build-log.md`:
+Create or update `ganvil-artifacts/frontend-build-log.md`:
 
 ```markdown
 # Frontend Build Log — Sprint {N}
@@ -117,7 +117,7 @@ Create or update `harness-artifacts/frontend-build-log.md`:
 
 ### Write Handoff Artifact
 
-Create `harness-artifacts/frontend-handoff-sprint-{N}.md`:
+Create `ganvil-artifacts/frontend-handoff-sprint-{N}.md`:
 
 ```markdown
 # Frontend Handoff — Sprint {N}
@@ -140,11 +140,11 @@ Create `harness-artifacts/frontend-handoff-sprint-{N}.md`:
 
 ## Handling Evaluation Feedback
 
-When you receive feedback from the evaluator (via `harness-artifacts/frontend-evaluation.md`):
+When you receive feedback from the evaluator (via `ganvil-artifacts/frontend-evaluation.md`):
 
 ### Step 1: Assess the Situation
 
-Read both the evaluation report AND the score trend from `harness-artifacts/pipeline-state.md` (if available). Look at:
+Read both the evaluation report AND the score trend from `ganvil-artifacts/pipeline-state.md` (if available). Look at:
 - Current scores per dimension
 - How scores have changed across iterations (if this is iteration 2+)
 - What specific issues the evaluator called out

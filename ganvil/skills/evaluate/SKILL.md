@@ -1,16 +1,16 @@
 ---
 name: evaluate
 description: >
-  Evaluate existing code using the harness evaluation framework. Automatically
+  Evaluate existing code using the ganvil evaluation framework. Automatically
   determines if the project is frontend, backend, or fullstack and applies the
   appropriate evaluator with four-dimension scoring. Use to QA-check any existing
   project or codebase.
 argument-hint: "[frontend|backend|auto] optional description of what to focus on"
 ---
 
-# Harness Evaluate — Standalone QA Evaluation
+# Ganvil Evaluate — Standalone QA Evaluation
 
-Evaluate an existing project or codebase using the harness evaluation framework, without requiring a prior plan or build.
+Evaluate an existing project or codebase using the ganvil evaluation framework, without requiring a prior plan or build.
 
 ## What to Do
 
@@ -21,7 +21,7 @@ Evaluate an existing project or codebase using the harness evaluation framework,
      - Has backend files (Python, Go, Rust, Java server code, `requirements.txt`, `Cargo.toml`, etc.) → BACKEND
      - Has both → evaluate as FULLSTACK (backend first, then frontend)
 
-2. Create `harness-artifacts/` directory if it doesn't exist.
+2. Create `ganvil-artifacts/` directory if it doesn't exist.
 
 3. **For frontend evaluation**: Delegate to the **frontend-evaluator** agent.
    - The evaluator will start the application, interact via browser, and score on:
@@ -29,7 +29,7 @@ Evaluate an existing project or codebase using the harness evaluation framework,
      - Originality (≥7 to pass)
      - Craft (≥6 to pass)
      - Functionality (≥7 to pass)
-   - Output: `harness-artifacts/frontend-evaluation.md`
+   - Output: `ganvil-artifacts/frontend-evaluation.md`
 
 4. **For backend evaluation**: Delegate to the **backend-evaluator** agent.
    - The evaluator will start the server, run tests, hit API endpoints, and score on:
@@ -37,7 +37,7 @@ Evaluate an existing project or codebase using the harness evaluation framework,
      - Data Integrity (≥7 to pass)
      - Code Quality (≥6 to pass)
      - Functional Completeness (≥7 to pass)
-   - Output: `harness-artifacts/backend-evaluation.md`
+   - Output: `ganvil-artifacts/backend-evaluation.md`
 
 5. **For fullstack evaluation**: Run both evaluators, backend first.
 
@@ -50,18 +50,18 @@ Evaluate an existing project or codebase using the harness evaluation framework,
 
 ```
 # Auto-detect project type and evaluate
-/harness:evaluate
+/ganvil:evaluate
 
 # Evaluate only the frontend
-/harness:evaluate frontend
+/ganvil:evaluate frontend
 
 # Evaluate with focus
-/harness:evaluate frontend focus on mobile responsiveness and accessibility
+/ganvil:evaluate frontend focus on mobile responsiveness and accessibility
 
 # Evaluate backend
-/harness:evaluate backend focus on API error handling
+/ganvil:evaluate backend focus on API error handling
 ```
 
 ## Note
 
-This skill evaluates code as-is. It does not require a `harness-artifacts/spec.md` or sprint contracts — the evaluator will assess the project against general quality standards. However, if a spec exists from a prior `/harness:plan`, the evaluator will use it for more targeted evaluation.
+This skill evaluates code as-is. It does not require a `ganvil-artifacts/spec.md` or sprint contracts — the evaluator will assess the project against general quality standards. However, if a spec exists from a prior `/ganvil:plan`, the evaluator will use it for more targeted evaluation.

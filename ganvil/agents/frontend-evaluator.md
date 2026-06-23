@@ -34,9 +34,9 @@ LLMs are naturally inclined to praise LLM-generated outputs. **Fight this tenden
 
 ## Before Evaluating
 
-1. **Read the spec**: `harness-artifacts/spec.md` for the product vision, design language, and feature list (note each feature's priority P0/P1/P2 if marked).
-2. **Read the sprint contract**: `harness-artifacts/sprint-{N}-contract.md` for the acceptance criteria of this sprint.
-3. **Read the build log**: `harness-artifacts/frontend-build-log.md` for what was built, how to run it, and the generator's self-assessment.
+1. **Read the spec**: `ganvil-artifacts/spec.md` for the product vision, design language, and feature list (note each feature's priority P0/P1/P2 if marked).
+2. **Read the sprint contract**: `ganvil-artifacts/sprint-{N}-contract.md` for the acceptance criteria of this sprint.
+3. **Read the build log**: `ganvil-artifacts/frontend-build-log.md` for what was built, how to run it, and the generator's self-assessment.
 4. **Read the Calibration Examples** from the `frontend-design` skill (design dimensions) **and** the Functional Completeness calibration below. Use them to anchor your scoring.
 5. **Start the application**: Use the instructions from the build log to start the dev server (and the backend, if FULLSTACK).
 
@@ -50,7 +50,7 @@ Navigate as a real user would: click every page/link, try all interactive elemen
 
 **State matrix (mandatory for each P0 feature)**: observe and screenshot the **empty / loading / success / error** states. A single "error" screenshot is not enough — each P0 feature must show all four states. (Aggregate 4 overview screenshots still required; per-feature screenshots only need to be attached for failing cells.)
 
-**Screenshot Requirements (MANDATORY):** Save ≥4 overview screenshots to `harness-artifacts/screenshots/`: landing (desktop), key flow after primary interaction, mobile (375px), error/edge state. Name descriptively: `sprint-{N}-landing.png`, etc.
+**Screenshot Requirements (MANDATORY):** Save ≥4 overview screenshots to `ganvil-artifacts/screenshots/`: landing (desktop), key flow after primary interaction, mobile (375px), error/edge state. Name descriptively: `sprint-{N}-landing.png`, etc.
 
 ### Step 2: Feature Loop Matrix (the core of Functional Completeness) ⭐
 
@@ -120,7 +120,7 @@ Go through each criterion from the sprint contract: PASS / FAIL, with exact repr
 
 ## Write the Evaluation Report
 
-Write to `harness-artifacts/frontend-evaluation.md` (TEAM/parallel: `frontend-evaluation-{SprintID}.md`):
+Write to `ganvil-artifacts/frontend-evaluation.md` (TEAM/parallel: `frontend-evaluation-{SprintID}.md`):
 
 ```markdown
 # Frontend Evaluation — Sprint {N}

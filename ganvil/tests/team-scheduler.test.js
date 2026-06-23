@@ -1,4 +1,4 @@
-// Unit tests for bin/team-scheduler. Run:  node --test harness/tests/
+// Unit tests for bin/team-scheduler. Run:  node --test ganvil/tests/
 // Each test builds a throwaway git repo + pipeline-state.md + spec DAG and
 // invokes the script as a child process (stateless, as in production).
 const test = require('node:test');
@@ -13,7 +13,7 @@ const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = fs;
 const SCRIPT = path.join(__dirname, '..', 'bin', 'team-scheduler');
 
 function setup(dagText, rows) {
-  // Nest the repo under a unique parent so worktrees (../harness-wt-*) resolve
+  // Nest the repo under a unique parent so worktrees (../ganvil-wt-*) resolve
   // INSIDE that parent — isolating them per test (avoids /tmp-wide collisions).
   const parent = mkdtempSync(path.join(os.tmpdir(), 'hs-'));
   const dir = path.join(parent, 'repo');
@@ -21,9 +21,9 @@ function setup(dagText, rows) {
   execFileSync('git', ['init', '-q', '-b', 'main', dir]);
   execFileSync('git', ['-C', dir, 'config', 'user.email', 't@t']); execFileSync('git', ['-C', dir, 'config', 'user.name', 't']);
   execFileSync('git', ['-C', dir, 'config', 'commit.gpgsign', 'false']);
-  mkdirSync(path.join(dir, 'harness-artifacts'), { recursive: true });
-  writeFileSync(path.join(dir, 'harness-artifacts', 'spec.md'), `# T\n\n## Sprint Dependency Graph\n${dagText}\n`);
-  writeFileSync(path.join(dir, 'harness-artifacts', 'pipeline-state.md'), stateMd(rows));
+  mkdirSync(path.join(dir, 'ganvil-artifacts'), { recursive: true });
+  writeFileSync(path.join(dir, 'ganvil-artifacts', 'spec.md'), `# T\n\n## Sprint Dependency Graph\n${dagText}\n`);
+  writeFileSync(path.join(dir, 'ganvil-artifacts', 'pipeline-state.md'), stateMd(rows));
   execFileSync('git', ['-C', dir, 'add', '-A']); execFileSync('git', ['-C', dir, 'commit', '-q', '-m', 'init']);
   return dir;
 }
@@ -59,8 +59,8 @@ test('allocate: assigns worktree+port+DB, status RUNNING, writes lease', () => {
   assert.equal(res.id, 'B1');
   assert.match(res.branch, /backend\/B1/);
   assert.ok(res.port >= 8100 && res.port <= 8199);
-  assert.match(res.db, /harness_b1/);
-  assert.ok(fs.existsSync(path.join(dir, 'harness-artifacts', 'sprint-B1-lease.json')));
+  assert.match(res.db, /ganvil_b1/);
+  assert.ok(fs.existsSync(path.join(dir, 'ganvil-artifacts', 'sprint-B1-lease.json')));
   rmSync(path.dirname(dir), { recursive: true, force: true });
 });
 
@@ -121,14 +121,14 @@ test('orphan cleanup: plain orphan removed, escalate-tagged worktree retained', 
   const dir = setup('- B1: deps []', [{ id: 'B1' }]);
   const uniq = path.basename(path.dirname(dir));
   // escalated orphan: worktree on backend/B1, with an escalate-B1 tag → must survive
-  execFileSync('git', ['-C', dir, 'worktree', 'add', path.join(dir, '..', 'harness-wt-backend-B1-' + uniq), '-b', 'backend/B1', 'main']);
+  execFileSync('git', ['-C', dir, 'worktree', 'add', path.join(dir, '..', 'ganvil-wt-backend-B1-' + uniq), '-b', 'backend/B1', 'main']);
   execFileSync('git', ['-C', dir, 'tag', 'escalate-B1']);
   // plain orphan: no escalate tag → must be cleaned
-  execFileSync('git', ['-C', dir, 'worktree', 'add', path.join(dir, '..', 'harness-wt-plain-' + uniq), '-b', 'plain/' + uniq, 'main']);
+  execFileSync('git', ['-C', dir, 'worktree', 'add', path.join(dir, '..', 'ganvil-wt-plain-' + uniq), '-b', 'plain/' + uniq, 'main']);
   const res = json(run(dir, ['init', 'all']));
   assert.ok(res.ok);
   assert.ok(res.cleaned.length >= 1, 'plain orphan should be cleaned');
-  const escWt = path.resolve(dir, '..', 'harness-wt-backend-B1-' + uniq);
+  const escWt = path.resolve(dir, '..', 'ganvil-wt-backend-B1-' + uniq);
   assert.ok(fs.existsSync(escWt), 'escalate-tagged worktree must be retained for post-mortem');
   rmSync(path.dirname(dir), { recursive: true, force: true });
 });

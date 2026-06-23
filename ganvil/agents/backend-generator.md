@@ -22,19 +22,19 @@ If the sprint contract carries TEAM lease fields (`Worktree`, `DB`, `Port`, `Dat
 - **Run migrations against your own `DB` only** (a per-branch database name from the contract). Your sibling branches have separate DBs — touching a shared DB in parallel will corrupt migrations.
 - **Start the server on the specified `Port`** (read from the contract; siblings use different ports).
 - **Git: operate on your `Branch` only** (`{phase}/{id}`). Commit prefix still `{Sprint-ID}:`.
-- **Per-sprint artifacts are `{SprintID}`-prefixed**: write `backend-build-log-{SprintID}.md` and `backend-handoff-{SprintID}.md` to the **main repo's** `harness-artifacts/`. Fixed names get clobbered by concurrent generators.
+- **Per-sprint artifacts are `{SprintID}`-prefixed**: write `backend-build-log-{SprintID}.md` and `backend-handoff-{SprintID}.md` to the **main repo's** `ganvil-artifacts/`. Fixed names get clobbered by concurrent generators.
 - If the contract has no lease fields, you are in serial mode — ignore this section.
 
 ## Before Starting a Sprint
 
-1. **Read the spec**: Read `harness-artifacts/spec.md` to understand the full product vision, data model, and API design.
-2. **Read previous handoff**: If this is not the first sprint, read `harness-artifacts/backend-handoff-sprint-{N-1}.md` to understand:
+1. **Read the spec**: Read `ganvil-artifacts/spec.md` to understand the full product vision, data model, and API design.
+2. **Read previous handoff**: If this is not the first sprint, read `ganvil-artifacts/backend-handoff-sprint-{N-1}.md` to understand:
    - What has been built so far
    - Current code structure and database schema
    - Known issues and technical debt
    - What this sprint should accomplish
-3. **Read sprint contract**: If available, read `harness-artifacts/sprint-{N}-contract.md` for the negotiated acceptance criteria.
-4. **Read evaluation feedback**: If this sprint is a retry after failed evaluation, read `harness-artifacts/backend-evaluation.md` for specific issues to fix. Also read `harness-artifacts/pipeline-state.md` for the score trend.
+3. **Read sprint contract**: If available, read `ganvil-artifacts/sprint-{N}-contract.md` for the negotiated acceptance criteria.
+4. **Read evaluation feedback**: If this sprint is a retry after failed evaluation, read `ganvil-artifacts/backend-evaluation.md` for specific issues to fix. Also read `ganvil-artifacts/pipeline-state.md` for the score trend.
 
 ## During a Sprint
 
@@ -93,7 +93,7 @@ Before declaring a sprint complete:
 
 ### Write Build Log
 
-Create or update `harness-artifacts/backend-build-log.md`:
+Create or update `ganvil-artifacts/backend-build-log.md`:
 
 ```markdown
 # Backend Build Log — Sprint {N}
@@ -130,7 +130,7 @@ Create or update `harness-artifacts/backend-build-log.md`:
 
 ### Write Handoff Artifact
 
-Create `harness-artifacts/backend-handoff-sprint-{N}.md`:
+Create `ganvil-artifacts/backend-handoff-sprint-{N}.md`:
 
 ```markdown
 # Backend Handoff — Sprint {N}
@@ -162,11 +162,11 @@ Create `harness-artifacts/backend-handoff-sprint-{N}.md`:
 
 ## Handling Evaluation Feedback
 
-When you receive feedback from the evaluator (via `harness-artifacts/backend-evaluation.md`):
+When you receive feedback from the evaluator (via `ganvil-artifacts/backend-evaluation.md`):
 
 ### Step 1: Assess the Situation
 
-Read both the evaluation report AND the score trend from `harness-artifacts/pipeline-state.md` (if available). Look at:
+Read both the evaluation report AND the score trend from `ganvil-artifacts/pipeline-state.md` (if available). Look at:
 - Current scores per dimension
 - Which acceptance criteria failed and why
 - Whether the failures are localized bugs or systemic architecture issues

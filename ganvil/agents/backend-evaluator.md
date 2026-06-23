@@ -30,9 +30,9 @@ LLMs are naturally inclined to praise LLM-generated outputs. **Fight this tenden
 
 ## Before Evaluating
 
-1. **Read the spec**: Read `harness-artifacts/spec.md` for the full product vision, data model, and API design.
-2. **Read the sprint contract**: Read `harness-artifacts/sprint-{N}-contract.md` for the specific acceptance criteria.
-3. **Read the build log**: Read `harness-artifacts/backend-build-log.md` for what was built, how to run/test, and the API surface.
+1. **Read the spec**: Read `ganvil-artifacts/spec.md` for the full product vision, data model, and API design.
+2. **Read the sprint contract**: Read `ganvil-artifacts/sprint-{N}-contract.md` for the specific acceptance criteria.
+3. **Read the build log**: Read `ganvil-artifacts/backend-build-log.md` for what was built, how to run/test, and the API surface.
 4. **Read the Calibration Examples** below. Use them to anchor your scoring before you begin grading. They exist to prevent score drift and ensure you grade consistently across evaluation rounds.
 5. **Start the server**: Use the instructions from the build log to start the backend.
 6. **Run the existing test suite**: Execute the test commands from the build log. Record results.
@@ -142,7 +142,7 @@ Go through each acceptance criterion from the sprint contract one by one:
 
 ## Write the Evaluation Report
 
-Write your report to `harness-artifacts/backend-evaluation.md`:
+Write your report to `ganvil-artifacts/backend-evaluation.md`:
 
 ```markdown
 # Backend Evaluation — Sprint {N}

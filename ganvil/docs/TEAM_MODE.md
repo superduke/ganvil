@@ -1,7 +1,7 @@
 # TEAM 模式 — 设计规格与修改方案
 
 > **Status:** IMPLEMENTED（v1.2.0 已落地 — 见 commit `1b9b1fa` 初版 + `28e298e` 调度器正确性修复）
-> **Target:** harness plugin — bugfix `v1.1.1`，TEAM `v1.2.0`
+> **Target:** ganvil plugin — bugfix `v1.1.1`，TEAM `v1.2.0`
 > **Date:** 2026-06-22（实施 2026-06-23）
 > **Author:** zhangyabei
 
@@ -19,7 +19,7 @@
 
 ## 背景与目标
 
-harness plugin 当前的执行模式有三：`SPRINT`（默认，串行）、`CONTINUOUS`、`CONTINUOUS-LITE`，均把 sprint 当严格串行单元执行（`B1 → B2 → … → F1 → F2`）。
+ganvil plugin 当前的执行模式有三：`SPRINT`（默认，串行）、`CONTINUOUS`、`CONTINUOUS-LITE`，均把 sprint 当严格串行单元执行（`B1 → B2 → … → F1 → F2`）。
 
 很多真实项目的 sprint 之间**没有依赖**（如"认证模块"与"报表模块"互不相交），串行执行白白消耗 wall-clock。TEAM 模式引入**阶段内并行**：依赖不相交的 sprint 在各自 git worktree 里**真正并发**执行，由无状态调度脚本 + orchestrator 协作完成 wave 级调度。
 
@@ -86,7 +86,7 @@ Team-Eligible: YES — branches {B1→B2} ∥ {B3}
 | Sprint | Deps | Status | Wave | Worktree | Branch | DB | Port | TaskID | Iter | Last Scores | Stall | Notes |
 |--------|------|--------|------|----------|--------|----|------|--------|------|-------------|-------|-------|
 | B1 | [] | MERGED | W1 | - | - | - | - | - | 2 | 7/7/7/8 | 0 | - |
-| B3 | [] | RUNNING | W1 | ../wt-b3 | backend/b3 | harness_b3 | 8101 | t_a3f9 | 1 | - | 0 | - |
+| B3 | [] | RUNNING | W1 | ../wt-b3 | backend/b3 | ganvil_b3 | 8101 | t_a3f9 | 1 | - | 0 | - |
 ```
 
 Status：`READY / RUNNING / EVAL-PENDING / MERGED / BLOCKED-CONFLICT / ESCALATED / FIXING`。
@@ -169,8 +169,8 @@ JSON schema（示例）：
 // next
 {"ok":true,"runnable":["B3","B4"],"running":["B1"],"wave":2,"cap":2}
 // allocate B3
-{"ok":true,"id":"B3","worktree":"../harness-wt-backend-b3","branch":"backend/b3",
- "db":"harness_b3","port":8101,"datadir":"../harness-wt-backend-b3/var"}
+{"ok":true,"id":"B3","worktree":"../ganvil-wt-backend-b3","branch":"backend/b3",
+ "db":"ganvil_b3","port":8101,"datadir":"../ganvil-wt-backend-b3/var"}
 // stall-recommend B3
 {"ok":true,"id":"B3","recommend":"scope-reduce","reason":"W flat across 2 iters"}
 ```
@@ -207,11 +207,11 @@ loop:
 > A5 的"等任一返回"**不是免费的**。背景派发是整个 feature 真正并发的唯一手段，必须显式写明，否则实现者会写成同步循环——伪并发、零 wall-clock 收益、却背着全部复杂度。
 
 - **派发方式**：wave 内 generator 用 Agent 工具的 **`run_in_background: true`** 派发（一次最多 C 个）。派发后该 tool call 立即返回 task id。
-- **"等任一返回" = yield + 完成通知**：orchestrator 派发完本波后**本轮结束（yield）**；当任一背景 generator 完成时，harness **以完成通知重新唤起** orchestrator——这就是循环里"等任一返回"的那个点。**不是阻塞 while 循环**。
+- **"等任一返回" = yield + 完成通知**：orchestrator 派发完本波后**本轮结束（yield）**；当任一背景 generator 完成时，ganvil **以完成通知重新唤起** orchestrator——这就是循环里"等任一返回"的那个点。**不是阻塞 while 循环**。
 - **gen 与 eval 分离派发**（保住上下文隔离）：generator 完成通知 → orchestrator 再**背景派发**该分支的 evaluator（独立 agent context）；evaluator 完成通知 → orchestrator 读 verdict → merge / iterate。这样多个分支的 gen/eval 各自在自己的背景 context 推进，orchestrator 只做协调。
 - **task↔sprint 关联（终评，扛压缩）**：完成通知只带 task id、不带 sprint id。派发后 `bind` 把 task id 写进 pipeline-state 的 TaskID 列，唤醒后 `lookup` 反查。**不靠对话记忆**——那扛不过长 build 的上下文压缩，而 pipeline-state 正是为此存在。
-- **唤醒时 drain 全部完成（终评）**：C 个背景 agent 可能在两次唤醒间、或近乎同时完成，harness 可能只唤醒一次。每次唤醒必须**重新扫描并处理所有新完成的 task**（逐个 gen→eval、逐个 merge）再 `next`——**不要写成只处理一个的单发 handler**，否则被漏掉的那个 task 可能等不到下一个事件而卡死。单写者规则保证 drain 内的多个 merge 仍串行安全。
-- **安全门**：若所在 harness 不支持背景派发（或被禁用），orchestrator gate 直接把该阶段退化为 `SPRINT`（A4 阶梯第 2 条）——TEAM 永远不会"看起来在跑其实串行"，而是显式降级。
+- **唤醒时 drain 全部完成（终评）**：C 个背景 agent 可能在两次唤醒间、或近乎同时完成，ganvil 可能只唤醒一次。每次唤醒必须**重新扫描并处理所有新完成的 task**（逐个 gen→eval、逐个 merge）再 `next`——**不要写成只处理一个的单发 handler**，否则被漏掉的那个 task 可能等不到下一个事件而卡死。单写者规则保证 drain 内的多个 merge 仍串行安全。
+- **安全门**：若所在 ganvil 不支持背景派发（或被禁用），orchestrator gate 直接把该阶段退化为 `SPRINT`（A4 阶梯第 2 条）——TEAM 永远不会"看起来在跑其实串行"，而是显式降级。
 
 ### A6 Worktree 生命周期 + 运行态隔离 + 不变量 + 恢复
 
@@ -219,7 +219,7 @@ loop:
 
 | 阶段 | 动作 |
 |---|---|
-| 建 | `git worktree add ../harness-wt-{phase}-{id} -b {phase}/{id}`，基线 = 当前 main HEAD |
+| 建 | `git worktree add ../ganvil-wt-{phase}-{id} -b {phase}/{id}`，基线 = 当前 main HEAD |
 | 跑 | generator/evaluator 在该 worktree 内作业；契约写绝对路径，agent 用绝对路径（避免 `cd`） |
 | PASS 合并 | `team-scheduler merge` → `git merge --no-ff {phase}/{id}` → `git worktree remove` |
 | FAIL/ESCALATED | 保留 worktree + 打 tag `escalate-{id}` |
@@ -229,8 +229,8 @@ loop:
 | 维度 | 分配 | 例 |
 |---|---|---|
 | 端口 | 池 8100–8199，系统占用探测后排除 | `8101` |
-| 数据库 | 每分支独立 DB 名 / 独立 sqlite 文件 | `harness_b3` / `./data/b3.db` |
-| 数据目录 | 独立 data/cache 目录 | `../harness-wt-b3/var/` |
+| 数据库 | 每分支独立 DB 名 / 独立 sqlite 文件 | `ganvil_b3` / `./data/b3.db` |
+| 数据目录 | 独立 data/cache 目录 | `../ganvil-wt-b3/var/` |
 
 > 三件套防**正确性踩踏**（两分支同库 migration 互踩）。资源争用由 A10 的 C 上限处理。
 
@@ -320,7 +320,7 @@ loop:
 | 情形 | 处理 |
 |---|---|
 | 脚本不可用 / 非 git 仓库 | 全局回退 SPRINT |
-| **harness 不支持背景派发** | gate 退 SPRINT（A4），绝不伪并发 |
+| **ganvil 不支持背景派发** | gate 退 SPRINT（A4），绝不伪并发 |
 | 脚本输出 malformed / 超时 | 当 exit=1 → 本阶段剩余退 SPRINT（main 已冻结，安全） |
 | 某分支死锁 | escalate 该分支，兄弟继续 |
 | 并发 cap 触顶 | RUNNABLE 排队 |
@@ -365,7 +365,7 @@ loop:
 |---|---|---|---|
 | B1 | `.claude-plugin/plugin.json` | 改 | 加 `userConfig`（默认 `always-serial`）；顺带修冗余键（#4） |
 | B2 | `agents/planner.md` | 改 | Step 3.5 加 `SPRINT-TEAM`；Step 4 输出 DAG + 启发式 |
-| B3 | `skills/harness-build/SKILL.md` | 改（主） | Phase 1.5 加 TEAM；**背景派发** wave；调用 `bin/team-scheduler`（JSON 契约）；冒烟→fix-forward；运行态隔离契约；C=2；Context Mgmt |
+| B3 | `skills/build/SKILL.md` | 改（主） | Phase 1.5 加 TEAM；**背景派发** wave；调用 `bin/team-scheduler`（JSON 契约）；冒烟→fix-forward；运行态隔离契约；C=2；Context Mgmt |
 | **B3b** | **`bin/team-scheduler`（node + 单测）** | **新增** | 无状态调度脚本 + JSON 契约 + exit code + **单写者/无锁** + 脚本级单测 |
 | B4 | `agents/{back,front}end-generator.md` | 改 | worktree 感知；**per-sprint 产物 `{SprintID}` 前缀**；独立 DB/端口从 contract 读 |
 | B5 | `agents/{back,front}end-evaluator.md` | 改（小） | 作用域=worktree；报告带前缀；冒烟由 orchestrator 触发 |
@@ -384,7 +384,7 @@ loop:
 - Step 5 模板插 `## Sprint Dependency Graph`。
 - Important Rules 加"DAG 诚实标依赖；独立判断保守"。
 
-### B3. `harness-build/SKILL.md`（核心）
+### B3. `build/SKILL.md`（核心）
 - Phase 1.5：模式表加 `SPRINT-TEAM`；执行 = **背景派发** wave + 调用 `bin/team-scheduler`（按 A5 JSON 契约）。
 - **Phase 3' Parallel Execution**（A5 + A5b）：
   - wave 内 generator 经 `run_in_background: true` 派发（≤ C）；evaluator 同样背景派发、与 generator 分离（保隔离）；
@@ -411,7 +411,7 @@ loop:
 
 ### B4. `{back,front}end-generator.md`
 新增 "TEAM / Worktree Awareness"：contract 若含 `Worktree / DB / Port / DataDir`，所有操作用绝对路径、限定该 worktree，不 `cd`；连指定 DB、用指定端口起服务；git 针对本分支。
-**per-sprint 产物命名（Rev 4）**：handoff/build-log 写到 main 的 `harness-artifacts/`，**TEAM 下所有 per-sprint 产物按 `{SprintID}` 前缀**（`backend-build-log-{SprintID}.md`、`backend-handoff-{SprintID}.md`）——`backend-build-log.md` 是固定名，不前缀会被并发 generator 互相覆盖。
+**per-sprint 产物命名（Rev 4）**：handoff/build-log 写到 main 的 `ganvil-artifacts/`，**TEAM 下所有 per-sprint 产物按 `{SprintID}` 前缀**（`backend-build-log-{SprintID}.md`、`backend-handoff-{SprintID}.md`）——`backend-build-log.md` 是固定名，不前缀会被并发 generator 互相覆盖。
 
 ### B5. `{back,front}end-evaluator.md`
 顶部："评估作用域 = contract 指定的 worktree（TEAM）或主仓库（串行）；用其 DB/端口。" 报告命名带 `{SprintID}` 前缀。注明集成冒烟由 orchestrator 在 wave 收尾触发，evaluator 不负责跨 sprint。
@@ -430,13 +430,13 @@ loop:
 ## Part C — 实施顺序与验收
 
 ### PR-A（v1.1.1，立即，与并行正交）
-- #1 Playwright 包名 → `@playwright/mcp`；#2 `settings.json`（移除无效 permissions）；#3 `echo`→`printf`/多行；#5 skill 命名→`/harness:build` 对齐；#9 TaskList 化（双写起手）；#11 改善口径统一。
-- 验收：v1.1.0 既有行为零回归 + 前端评测能起浏览器（#1）+ `.gitignore` 多行正确（#3）+ `/harness:build` 可调（#5）。
+- #1 Playwright 包名 → `@playwright/mcp`；#2 `settings.json`（移除无效 permissions）；#3 `echo`→`printf`/多行；#5 skill 命名→`/ganvil:build` 对齐；#9 TaskList 化（双写起手）；#11 改善口径统一。
+- 验收：v1.1.0 既有行为零回归 + 前端评测能起浏览器（#1）+ `.gitignore` 多行正确（#3）+ `/ganvil:build` 可调（#5）。
 
 ### PR-B（v1.2.0，TEAM 本体）
 
 **批次 1（无并行风险）**：B2（DAG + 资格 + 启发式）、B6/B7。
-- 验收：`/harness:plan` 输出含 Dependency Graph；串行零变化。
+- 验收：`/ganvil:plan` 输出含 Dependency Graph；串行零变化。
 
 **批次 2（串行兼容 + 脚本骨架 + 并发机制）**：B3（**背景派发**循环 + JSON 契约 + 失败回退）+ **B3b 最小版 + 脚本级单测** + B4/B5（worktree 感知 + 运行态隔离契约 + 产物前缀）+ 集成冒烟→fix-forward。`C=1` 退化。
 - **重点验收**：背景派发真的并发（`C=2` 时观察两 generator 时间重叠，而非先后）；`defaultParallelism=always-serial` 时**行为与 v1.1.1 完全一致**（A13#9）；B3b 单测全绿。
@@ -459,7 +459,7 @@ loop:
 | 🔴 #1 Playwright 包名 | `@anthropic-ai/playwright-mcp`（npm 404）→ 浏览器自动化起不来 | PR-A | → `@playwright/mcp` |
 | 🔴 #2 settings.json permissions | plugin 级不支持该键，整块失效 | PR-A | 移除；走项目/用户级 settings 或 hooks |
 | 🔴 #3 `.gitignore` echo | bash 下 `\n` 是字面量 → 单行坏文件 | PR-A | → `printf` 或多行 echo |
-| 🟠 #5 skill 命名 | `/harness:harness-build` 与文档 `/harness:build` 不符 | PR-A | 改名 `build/plan/evaluate` 或修文档 |
+| 🟠 #5 skill 命名 | `/ganvil:build` 与文档 `/ganvil:build` 不符 | PR-A | 改名 `build/plan/evaluate` 或修文档 |
 | 🟠 #9 注释解析脆弱 | 正则刮 HTML 注释 | PR-A 起步（双写）/ v1.3.0 完成 | 脚本 JSON 优先、注释回退；v1.3.0 移除 |
 | 🟠 #11 改善口径未定义 | stall 判定无依据 | PR-A | 统一加权分 `W`（A8） |
 
@@ -484,7 +484,7 @@ loop:
 4. **运行态三件套隔离**（DB + 数据目录 + 端口）：无正确性踩踏。
 5. **逐 sprint 评估 + wave 集成冒烟 → fix-forward**：合并态回归可见且只前进不回退。
 6. **orchestrator 单线程 / 单写者**（Rev 4）：`team-scheduler` 串行调用、`pipeline-state.md` 同一时刻一个写者、**无需锁/daemon**；背景 generator 禁止调脚本。
-7. **并发靠背景派发**（Rev 4）：gen/eval 经 `run_in_background: true` + 完成通知实现"等任一返回"；harness 不支持时 gate 退 SPRINT，绝不伪并发。
+7. **并发靠背景派发**（Rev 4）：gen/eval 经 `run_in_background: true` + 完成通知实现"等任一返回"；ganvil 不支持时 gate 退 SPRINT，绝不伪并发。
 
 ### 接口契约（orchestrator ↔ team-scheduler）
 - stdout = 严格 JSON（per-command schema）；人类日志走 stderr。

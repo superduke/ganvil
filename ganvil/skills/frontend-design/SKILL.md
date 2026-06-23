@@ -9,7 +9,7 @@ user-invocable: false
 
 # Frontend Design Standards
 
-This skill provides the design evaluation criteria and aesthetic guidelines used by the harness planner and frontend evaluator. It encodes design principles that turn subjective judgments like "is this design good?" into concrete, gradable terms.
+This skill provides the design evaluation criteria and aesthetic guidelines used by the ganvil planner and frontend evaluator. It encodes design principles that turn subjective judgments like "is this design good?" into concrete, gradable terms.
 
 ## Design Thinking Framework
 

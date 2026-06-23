@@ -1,14 +1,14 @@
 {
-  "name": "harness-local",
+  "name": "ganvil-local",
   "owner": {
     "name": "zhangyabei"
   },
   "plugins": [
     {
-      "name": "harness",
-      "source": "./harness",
+      "name": "ganvil",
+      "source": "./ganvil",
       "description": "Long-running autonomous coding harness with Planner-Generator-Evaluator architecture and Sprint decomposition.",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "author": {
         "name": "zhangyabei"
       }

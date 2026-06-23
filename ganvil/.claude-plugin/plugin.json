@@ -1,13 +1,13 @@
 {
-  "name": "harness",
+  "name": "ganvil",
   "description": "Long-running autonomous coding harness with Planner-Generator-Evaluator architecture and Sprint decomposition. Builds complete applications from simple descriptions.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": {
     "name": "zhangyabei"
   },
   "license": "MIT",
   "keywords": [
-    "harness",
+    "ganvil",
     "autonomous-coding",
     "planner-generator-evaluator",
     "sprint-decomposition",

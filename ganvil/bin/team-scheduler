@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// team-scheduler — stateless TEAM wave scheduler for the harness plugin.
+// team-scheduler — stateless TEAM wave scheduler for the ganvil plugin.
 // Each invocation is a fresh process: it re-derives everything from
-//   <cwd>/harness-artifacts/pipeline-state.md  +  git  +  spec DAG
+//   <cwd>/ganvil-artifacts/pipeline-state.md  +  git  +  spec DAG
 // and writes only pipeline-state.md (+ lease files via allocate, git via merge).
 // Contract: one strict JSON object on stdout per command; human logs on stderr;
 // exit 0 = ok, 1 = recoverable (orchestrator falls back to SPRINT), 2 = fatal.
@@ -12,7 +12,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const net = require('net');
 
-const ARTIFACTS = path.join(process.cwd(), 'harness-artifacts');
+const ARTIFACTS = path.join(process.cwd(), 'ganvil-artifacts');
 const STATE = path.join(ARTIFACTS, 'pipeline-state.md');
 const SPEC = path.join(ARTIFACTS, 'spec.md');
 const PORT_MIN = 8100;
@@ -158,7 +158,7 @@ async function nextPort(rows) {
   }
   return 0;
 }
-function dbName(id) { return 'harness_' + id.toLowerCase().replace(/[^a-z0-9]/g, '_'); }
+function dbName(id) { return 'ganvil_' + id.toLowerCase().replace(/[^a-z0-9]/g, '_'); }
 
 // ---------- commands ----------
 function cmdInit(phase) {
@@ -172,7 +172,7 @@ function cmdInit(phase) {
   rows = reconcileWithGit(rows);
   // Orphan worktree cleanup: remove worktrees neither recorded nor escalate-tagged.
   // Skip the main worktree (== cwd) and normalize paths to absolute — `git worktree
-  // list` prints absolute paths while pipeline-state stores relative ../harness-wt-*,
+  // list` prints absolute paths while pipeline-state stores relative ../ganvil-wt-*,
   // so a naive Set compare never matched (and would have nuked live worktrees on resume).
   let wtList = [];
   try { wtList = git(['worktree', 'list']).split('\n').filter(Boolean); } catch {}
@@ -210,7 +210,7 @@ async function cmdAllocate(id) {
   if (r.status !== 'PENDING' && r.status !== 'READY') fail('sprint ' + id + ' not allocatable (status ' + r.status + ')');
   const phase = /^[BF]/.test(id) ? (id.startsWith('B') ? 'backend' : 'frontend') : 'single';
   const branch = `${phase}/${id}`;
-  const wt = path.join('..', `harness-wt-${phase}-${id}`);
+  const wt = path.join('..', `ganvil-wt-${phase}-${id}`);
   try { git(['worktree', 'add', wt, '-b', branch, defaultBranch()]); }
   catch (e) {
     // `worktree add -b` may have created the branch before failing — drop both so a
@@ -258,11 +258,11 @@ function cmdMerge(id) {
   const open = r.deps.filter(d => !depSatisfied(rows, d));
   if (open.length) fail('merge refused: deps not in main: ' + open.join(','), 2);
   if (!r.branch) fail('no branch for ' + id, 2);
-  try { git(['merge', '--no-ff', '-m', `harness: merge ${id}`, r.branch]); }
+  try { git(['merge', '--no-ff', '-m', `ganvil: merge ${id}`, r.branch]); }
   catch (e) { fail('git merge failed (conflict?): ' + (e.message || ''), 1); }
   // remove the worktree BEFORE clearing the field (the old clear-then-use always
   // fell through to the reconstructed fallback by accident).
-  const wtToRemove = r.worktree || path.join('..', `harness-wt-${r.branch.split('/')[0]}-${id}`);
+  const wtToRemove = r.worktree || path.join('..', `ganvil-wt-${r.branch.split('/')[0]}-${id}`);
   r.status = 'MERGED'; r.port = 0; r.db = ''; r.taskid = ''; r.worktree = '';
   try { git(['worktree', 'remove', wtToRemove]); } catch (e) { log('worktree remove note: ' + e.message); }
   writeState(rows);

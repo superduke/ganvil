@@ -10,7 +10,7 @@ user-invocable: false
 
 # AI Integration Guidelines
 
-This skill provides patterns and best practices for weaving AI-powered features into applications built by the harness. It is referenced by the planner (when designing specs) and generators (when implementing AI features).
+This skill provides patterns and best practices for weaving AI-powered features into applications built by the ganvil. It is referenced by the planner (when designing specs) and generators (when implementing AI features).
 
 ## When to Add AI Features
 

@@ -1,4 +1,4 @@
-# Harness Plugin for Claude Code
+# Ganvil — Autonomous Coding Harness for Claude Code
 
 A long-running autonomous coding harness with **Planner → Generator ↔ Evaluator** architecture and Sprint decomposition, inspired by [Anthropic's harness design research](https://www.anthropic.com/engineering/harness-design-long-running-apps).
 
@@ -32,15 +32,15 @@ This plugin transforms a brief product description (1-4 sentences) into a workin
 ### Local Testing
 
 ```bash
-claude --plugin-dir /path/to/harness
+claude --plugin-dir /path/to/ganvil
 ```
 
 ### Permanent Installation
 
-Copy the `harness/` directory to your Claude Code plugins location, or use:
+Copy the `ganvil/` directory to your Claude Code plugins location, or use:
 
 ```bash
-claude /plugin install /path/to/harness
+claude /plugin install /path/to/ganvil
 ```
 
 ## Usage
@@ -50,11 +50,11 @@ claude /plugin install /path/to/harness
 Build a complete application from a description:
 
 ```
-/harness:build A collaborative whiteboard tool with real-time editing and AI-assisted drawing
+/ganvil:build A collaborative whiteboard tool with real-time editing and AI-assisted drawing
 ```
 
 This will:
-1. Plan → generate a full product spec in `harness-artifacts/spec.md`
+1. Plan → generate a full product spec in `ganvil-artifacts/spec.md`
 2. Classify the project (e.g., FULLSTACK)
 3. Execute backend sprints (if applicable), each evaluated and iterated until passing
 4. Execute frontend sprints, each evaluated and iterated until passing
@@ -64,25 +64,25 @@ This will:
 Generate a product spec without building:
 
 ```
-/harness:plan A data visualization dashboard for IoT sensor data
+/ganvil:plan A data visualization dashboard for IoT sensor data
 ```
 
-Output: `harness-artifacts/spec.md`
+Output: `ganvil-artifacts/spec.md`
 
 ### Just Evaluate
 
 QA-evaluate an existing project:
 
 ```
-/harness:evaluate                          # auto-detect project type
-/harness:evaluate frontend                 # evaluate frontend only
-/harness:evaluate backend focus on auth    # evaluate backend with focus area
+/ganvil:evaluate                          # auto-detect project type
+/ganvil:evaluate frontend                 # evaluate frontend only
+/ganvil:evaluate backend focus on auth    # evaluate backend with focus area
 ```
 
 ## Architecture
 
 ```
-harness/
+ganvil/
 ├── .claude-plugin/plugin.json    # Plugin manifest
 ├── .mcp.json                     # Playwright MCP for browser automation
 ├── agents/
@@ -92,9 +92,9 @@ harness/
 │   ├── frontend-evaluator.md    # Frontend QA (4-dimension scoring + screenshots)
 │   └── backend-evaluator.md     # Backend QA (4-dimension scoring + calibration)
 ├── skills/
-│   ├── harness-build/SKILL.md   # Main entry: full pipeline orchestration
-│   ├── harness-plan/SKILL.md    # Planning only
-│   ├── harness-evaluate/SKILL.md # Evaluation only
+│   ├── build/SKILL.md     # Main entry: full pipeline orchestration
+│   ├── plan/SKILL.md      # Planning only
+│   ├── evaluate/SKILL.md  # Evaluation only
 │   ├── frontend-design/SKILL.md # Design standards + calibration examples + reference library
 │   └── ai-integration/SKILL.md  # AI feature patterns + Anthropic API
 ├── settings.json
@@ -103,7 +103,7 @@ harness/
 
 ### Communication via Files
 
-Agents communicate through `harness-artifacts/`:
+Agents communicate through `ganvil-artifacts/`:
 
 | File | Producer | Consumer |
 |------|----------|----------|
@@ -148,7 +148,7 @@ A sprint passes only if ALL dimensions meet their thresholds AND ≥80% of accep
 
 - **TEAM mode (SPRINT-TEAM)** — phase-internal parallelism: independent sprints run concurrently in separate worktrees, scheduled by a stateless `bin/team-scheduler` (JSON + exit-code contract; `main` stays dependency-closed). Default `always-serial`; opt in via `userConfig.defaultParallelism = auto|always-team`. See [`docs/TEAM_MODE.md`](docs/TEAM_MODE.md).
 - **Frontend closed-loop evaluation** — new HIGH-weight Functional Completeness dimension backed by a Feature Loop Matrix (6 stages, incl. survives-refresh) and a persistence veto. Pretty-but-hollow apps now FAIL. See [`docs/EVAL_REWORK.md`](docs/EVAL_REWORK.md).
-- **Bugfixes (from v1.1.1)** — correct Playwright MCP package (`@playwright/mcp`), portable `.gitignore` generation, `/harness:build|plan|evaluate` invocations, explicit improvement metric `W`, TaskList progress mirroring.
+- **Bugfixes (from v1.1.1)** — correct Playwright MCP package (`@playwright/mcp`), portable `.gitignore` generation, `/ganvil:build|plan|evaluate` invocations, explicit improvement metric `W`, TaskList progress mirroring.
 
 ### When to Use TEAM Mode
 - ✅ Good fit: ≥4 sprints per phase with independent features (auth + reporting + analytics); microservices / multi-module; wall-clock sensitive.

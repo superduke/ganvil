@@ -4,7 +4,7 @@ description: >
   Product specification planner. Takes a brief user description (1-4 sentences)
   and expands it into a complete product spec with Sprint decomposition.
   Classifies the project as frontend/backend/fullstack, tags features by priority
-  (P0/P1/P2), and emits a sprint dependency DAG. Use when starting a new harness
+  (P0/P1/P2), and emits a sprint dependency DAG. Use when starting a new ganvil
   build or when the user needs a detailed plan.
 tools: Read, Write, Grep, Glob
 model: inherit
@@ -70,7 +70,7 @@ For **FULLSTACK**: number backend sprints `B1, B2, …`; frontend `F1, F2, …`;
 
 ### Step 5: Write the Spec File
 
-Write to `harness-artifacts/spec.md`:
+Write to `ganvil-artifacts/spec.md`:
 
 ```markdown
 # [Project Name]
